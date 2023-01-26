@@ -1,0 +1,13 @@
+contextily
+fiona
+geopandas
+geoserver-rest
+matplotlib
+minio
+pandas
+pydantic[dotenv]
+pyodm
+requests
+rasterio
+shapely
+tqdm
