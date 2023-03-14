@@ -11,3 +11,6 @@ requests
 rasterio
 shapely
 tqdm
+xsdata>=21.9
+lxml>=4.9.2
+owslib
