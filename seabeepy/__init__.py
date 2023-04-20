@@ -1,1 +1,1 @@
-from . import anno, ortho, geo
+from . import anno, ortho, geo, storage
