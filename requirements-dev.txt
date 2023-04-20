@@ -1,0 +1,2 @@
+xsdata[cli]>=22.12
+black
