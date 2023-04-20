@@ -10,22 +10,25 @@ GEOSERVER_URL = r"https://geonode.seabee.sigma2.no/geoserver"
 GEONODE_URL = r"https://geonode.seabee.sigma2.no/api/v2/"
 
 
-def standardise_orthophoto(in_tif, out_tif, red_band=1, green_band=2, blue_band=3):
+def standardise_orthophoto(in_tif, out_tif, red_band=1, green_band=2, blue_band=3, nodata=255):
     """Create a 3-band, cloud-optimised GeoTIFF ready for upload to GeoServer.
     This function is useful to ensure raster datasets uploaded to GeoServer are
     consistent, regardless of who produced them with which software.
 
     Builds an RGB composite from the specified bands from 'in_tif'. Bands are
-    converted to 8-bit (with value scaling) and saved using LZW compression.
-    Existing overview layers will be discarded and rebuilt.
+    converted to 8-bit (with value scaling), any alpha bands are removed and 
+    existing overview layers are discarded and rebuilt. The file is saved using
+    LZW compression.
 
     Args
         in_tif:     Str. Path to original GeoTIFF
         out_tif:    Str. Path to GeoTIFF to be created. Must be a folder where you
                     have "write" access i.e. somewhere in your HOME directory
-        red_band:   Int. Band number for red band in 'in_tif'
-        green_band: Int. Band number for green band in 'in_tif'
-        blue_band:  Int. Band number for blue band in 'in_tif'
+        red_band:   Int. Default 1. Band number for red band in 'in_tif'
+        green_band: Int. Default 2. Band number for green band in 'in_tif'
+        blue_band:  Int. Default 3. Band number for blue band in 'in_tif'
+        nodata:     Int. Default 255. Value to use for NoData. Typically 255 for 
+                    seabirds and 0 for habitat mapping.
 
     Returns
         None. Raster is saved to the specified path.
@@ -35,6 +38,8 @@ def standardise_orthophoto(in_tif, out_tif, red_band=1, green_band=2, blue_band=
             raise ValueError(
                 "'red_band', 'green_band' and 'blue_band' must all be integers."
             )
+    
+    assert isinstance(nodata, int) and (0 <= nodata <= 255), "'nodata' must be an integer between 0 and 255."
 
     cmd = [
         "gdal_translate",
@@ -60,7 +65,7 @@ def standardise_orthophoto(in_tif, out_tif, red_band=1, green_band=2, blue_band=
         "BIGTIFF=YES",
         "-scale",
         "-a_nodata",
-        "255",
+        str(nodata),
         in_tif,
         out_tif,
     ]
