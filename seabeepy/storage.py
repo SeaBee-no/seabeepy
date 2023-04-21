@@ -1,12 +1,11 @@
 import os
 from pathlib import Path
 
-from minio import Minio
-from minio.error import S3Error
+import s3fs
 
 
 def minio_login(user, password):
-    """Login to MinIO Python client.
+    """Login to MinIO using s3fs.
 
     Args
         access_key: Str. Personal access ID for MinIO. Usually a user's
@@ -14,12 +13,12 @@ def minio_login(user, password):
         secret_key: Str. Personal secret key (i.e. password) for MinIO
 
     Returns
-        MinIO client object.
+        s3fs client object.
     """
-    client = Minio(
-        "storage.seabee.sigma2.no",
-        access_key=user,
-        secret_key=password,
+    client = s3fs.S3FileSystem(
+        key=user,
+        secret=password,
+        endpoint_url="https://storage.seabee.sigma2.no",
     )
 
     return client
@@ -35,109 +34,84 @@ def _jhub_path_to_minio(abs_path):
                   (i.e. within the 'shared-seabee-ns9879k' folder)
 
     Returns
-        Tuple of strings (bucket_name, object_name).
+        Tuple of strings (bucket_name, object_name) if file is on MinIO, else
+        (None, None).
     """
     abs_path = Path(abs_path)
-    bucket_idx = abs_path.parts.index("shared-seabee-ns9879k") + 1
-    bucket_name = abs_path.parts[bucket_idx]
-    obj_name = "/".join(abs_path.parts[bucket_idx + 1 :])
-
-    return (bucket_name, obj_name)
-
-
-def check_minio_exists(bucket_name, obj_name, client):
-    """Check whether 'obj_name' already exists on MinIO in 'bucket_name'.
-
-    NOTE: On the SeaBee JupyterHub, it is much easier to use the 'os' module, since
-    users have read access to files on MinIO. This function is only useful if you're
-    using seabeepy from elsewhere.
-
-    Args
-        bucket_name: Str. Name of bucket
-        obj_name:    Str. Name of object in bucket
-        client:      Obj. Active MinIO Python client (from the 'minio_login' function)
-
-    Returns
-        Tuple (exists, obj_type). 'exists' is Bool (True if object exists,
-        otherwise False). 'obj_type' is either 'File', 'Dir' or None.
-    """
     try:
-        # Check if file
-        meta = client.stat_object(bucket_name, obj_name)
-        exists = True
-        obj_type = "File"
-    except S3Error:
-        # Check if folder
-        objects = client.list_objects(bucket_name, prefix=obj_name, recursive=False)
-        objects = [
-            obj for obj in objects if (obj.object_name == f"{obj_name}/") and obj.is_dir
-        ]
-        if len(objects) > 0:
-            exists = True
-            obj_type = "Dir"
-        else:
-            exists = False
-            obj_type = None
+        bucket_idx = abs_path.parts.index("shared-seabee-ns9879k") + 1
+        bucket_name = abs_path.parts[bucket_idx]
+        obj_name = "/".join(abs_path.parts[bucket_idx + 1 :])
 
-    return (exists, obj_type)
+        return (bucket_name, obj_name)
+
+    except ValueError:
+        return (None, None)
 
 
-def copy_file_minio(src_path, dst_path, client, overwrite=False):
-    """Convenience function for copying files to MinIO using absolute file paths.
-    'src_path' can be anything the user had read access to; 'dst_path' must be a
-    location on MinIO.
+def copy_file(src_path, dst_path, client, overwrite=False):
+    """Convenience function for copying files to MinIO. 'src_path' can be anything the
+    user had read access to; 'dst_path' must be a location on MinIO.
 
     Args
-        src_path:  Str. Absolute source path
-        dst_path:  Str. Absolute destination path from JupyterHub to a file on MinIO
-                   (i.e. something within the 'shared-seabee-ns9879k' folder)
-        client:    Obj. Active MinIO Python client (from the 'minio_login' function)
+        src_path:  Str. Path to source file on JupyterHub
+        dst_path:  Str. Path to destination file on MinIO from JupyterHub (i.e. something
+                   within the 'shared-seabee-ns9879k' folder)
+        client:    Obj. Active s3fs Python client (from the 'minio_login' function)
         overwrite: Bool. Default False. Whether to overwrite 'dst_path' if it already
                    exists
 
     Returns
-        MinIO result object. Source file is copied to destination.
+        s3fs result object. Source file is copied to destination.
     """
-    if os.path.isfile(dst_path) and not overwrite:
-        raise OSError(
-            f"File '{dst_path}' already exists. Pass 'overwrite = True' to replace."
-        )
-
+    src_bucket, src_name = _jhub_path_to_minio(src_path)
     dst_bucket, dst_name = _jhub_path_to_minio(dst_path)
 
-    # Create dst_bucket if necessary
-    dst_bucket_exists = client.bucket_exists(dst_bucket)
-    if not dst_bucket_exists:
-        client.make_bucket(dst_bucket)
+    if dst_bucket is None:
+        raise OSError(f"Could not identify destination '{dst_path}' on MinIO.")
 
-    # Copy
-    with open(src_path, "rb") as file_data:
-        file_stat = os.stat(src_path)
-        result = client.put_object(dst_bucket, dst_name, file_data, file_stat.st_size)
+    dst_path = os.path.join(dst_bucket, dst_name)
+    if client.exists(dst_path) and not overwrite:
+        raise OSError(
+            f"Destination file '{dst_path}' already exists. Pass 'overwrite = True' to replace."
+        )
+
+    if src_bucket:
+        # Source file is on MinIO, so use 'cp' as it's faster
+        src_path = os.path.join(src_bucket, src_name)
+        if not client.isfile(src_path):
+            raise OSError(f"Source file '{src_path}' is not a file.")
+        result = client.cp(src_path, dst_path)
+    else:
+        # Source file is not on MinIO
+        if not os.path.isfile(src_path):
+            raise OSError(f"Source file '{src_path}' is not a file.")
+        result = client.put(src_path, dst_path)
 
     return result
 
 
-def delete_file_minio(fpath, client):
+def delete_file(fpath, client):
     """Delete a file on MinIo.
 
     Args
         fpath:  Str. Absolute path to object from JupyterHub
-        client: Obj. Active MinIO Python client (from the 'minio_login' function)
+        client: Obj. Active s3fs Python client (from the 'minio_login' function)
 
     Returns
-        MinIO result object
+        s3fs result object
     """
-    if os.path.isfile(fpath):
-        bucket, name = _jhub_path_to_minio(fpath)
-        result = client.remove_object(bucket, name)
+    bucket, name = _jhub_path_to_minio(fpath)
+    if bucket is None:
+        raise OSError(f"'{fpath}' is not a file on MinIO.")
     else:
-        raise OSError(f"'{fpath}' is not a file.")
+        fpath = os.path.join(bucket, name)
+        result = client.rm(fpath)
 
     return result
 
 
-def delete_folder_minio(folder, client):
+def delete_folder(folder, client):
     """Delete a folder and all contents on MinIO. Note that if parent directory of
     'folder' only contains 'folder' (i.e. the parent will become empty after
     'folder' is removed), then the parent folder is also removed. This is just how
@@ -145,25 +119,26 @@ def delete_folder_minio(folder, client):
 
     Args
         folder: Str. Absolute path to MinIO folder from JupyterHub
-        client: Obj. Active MinIO Python client (from the 'minio_login' function)
+        client: Obj. Active s3fs Python client (from the 'minio_login' function)
 
     Returns
         None. Folder is deleted
     """
-    if os.path.isdir(folder):
-        bucket, name = _jhub_path_to_minio(folder)
-        objects_to_delete = client.list_objects(bucket, prefix=name, recursive=True)
-        for obj in objects_to_delete:
-            client.remove_object(bucket, obj.object_name)
-    else:
+    folder = folder.rstrip(os.sep)
+    bucket, name = _jhub_path_to_minio(folder)
+    if bucket is None:
+        raise OSError(f"'{folder}' is not a location on MinIO.")
+
+    folder = os.path.join(bucket, name)
+    if not client.isdir(folder):
         raise OSError(f"'{folder}' is not a directory.")
 
-    return None
+    result = client.rm(folder, recursive=True)
+
+    return result
 
 
-def copy_folder_minio(
-    src_fold, dst_fold, client, overwrite=False, containing_folder=True
-):
+def copy_folder(src_fold, dst_fold, client, overwrite=False, containing_folder=True):
     """Copy everything in 'src_fold' to 'dst_fold', maintaining the subfolder structure
     within 'src_fold'. 'src_fold' can be anything the user had read access to;
     'dst_fold' must be a location on MinIO (both expressed as absolute paths on the Hub).
@@ -175,7 +150,7 @@ def copy_folder_minio(
         src_fold:          Str. Absolute source path to folder on SeaBee's JupyterHub
         dst_fold:          Str. Absolute destination folder on MinIO (i.e. something
                            within the 'shared-seabee-ns9879k' folder)
-        client:            Obj. Active MinIO Python client (from the 'minio_login' function)
+        client:            Obj. Active s3fs Python client (from the 'minio_login' function)
         overwrite:         Bool. Default False. Whether to overwrite 'dst_path' if it
                            already exists
         containing_folder: Bool. Default True. If True, 'src_fold' itself will be copied
@@ -185,26 +160,40 @@ def copy_folder_minio(
     Returns
         None. Folder and contents are copied.
     """
-    if containing_folder:
-        dst_fold = os.path.join(dst_fold, os.path.basename(src_fold))
+    src_fold = src_fold.rstrip(os.sep)
+    dst_fold = dst_fold.rstrip(os.sep)
+    src_bucket, src_name = _jhub_path_to_minio(src_fold)
+    dst_bucket, dst_name = _jhub_path_to_minio(dst_fold)
 
-    if os.path.isdir(dst_fold) and not overwrite:
+    if dst_bucket is None:
+        raise OSError(f"Could not identify destination '{dst_fold}' on MinIO.")
+
+    if containing_folder:
+        dst_fold = os.path.join(dst_bucket, dst_name, os.path.basename(src_fold))
+    else:
+        dst_fold = os.path.join(dst_bucket, dst_name)
+
+    if client.exists(dst_fold) and not overwrite:
         raise OSError(
-            f"Folder '{dst_fold}' already exists. Pass 'overwrite = True' to replace."
+            f"Destination folder '{dst_fold}' already exists. Pass 'overwrite = True' to replace."
         )
 
-    if os.path.isdir(dst_fold) and overwrite:
-        delete_folder_minio(dst_fold, client)
+    if client.exists(dst_fold) and overwrite:
+        delete_folder(dst_fold, client)
 
-    src_list = Path(src_fold).rglob("*")
-    src_list = [path for path in src_list if os.path.isfile(path)]
-    for src_path in src_list:
-        src_path = str(src_path)
-        rel_path = os.path.relpath(src_path, start=src_fold)
-        dst_path = os.path.join(dst_fold, rel_path)
-        copy_file_minio(src_path, dst_path, client, overwrite=False)
+    if src_bucket:
+        # Source folder is on MinIO, so use 'cp' as it's faster
+        src_fold = os.path.join(src_bucket, src_name)
+        if not client.isdir(src_fold):
+            raise OSError(f"Source folder '{src_fold}' is not a directory.")
+        result = client.cp(src_fold, dst_fold, recursive=True)
+    else:
+        # Source file is not on MinIO
+        if not os.path.isdir(src_fold):
+            raise OSError(f"Source folder '{src_fold}' is not a directory.")
+        result = client.put(src_fold, dst_fold, recursive=True)
 
-    return None
+    return result
 
 
 def copy_nodeodm_results(task_id, mission_fold, client):
@@ -241,7 +230,7 @@ def copy_nodeodm_results(task_id, mission_fold, client):
         src_fold = os.path.join(res_fold, src)
         dst_fold = os.path.join(mission_fold, dst)
         if os.path.isdir(src_fold):
-            copy_folder_minio(
+            copy_folder(
                 src_fold,
                 dst_fold,
                 client,
@@ -263,6 +252,6 @@ def copy_nodeodm_results(task_id, mission_fold, client):
         src_path = os.path.join(res_fold, src)
         dst_path = os.path.join(mission_fold, dst, src)
         if os.path.isfile(src_path):
-            copy_file_minio(src_path, dst_path, client, overwrite=False)
+            copy_file(src_path, dst_path, client, overwrite=False)
 
     return None
