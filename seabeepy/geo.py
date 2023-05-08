@@ -147,22 +147,20 @@ def publish_to_geonode(layer_name, user, password, workspace="geonode", wait=10)
     return None
 
 
-def update_geonode_metadata(layer_name, user, password, token, metadata):
+def update_geonode_metadata(layer_name, user, password, metadata):
     """Update metadata for a layer published on GeoNode.
 
     Args
         layer_name: Str. Path to raster data to be uploaded
         user:       Str. GeoNode admin. user
         password:   Str. GeoNode admin. password
-        token:      Str. GeoNode admin. token
         metadata:   Dict. Dict with metadata attributes as keys
 
     Returns
         None. Metadata attributes are updated.
     """
     filter_url = GEONODE_URL + f"resources?search={layer_name}&search_fields=title"
-    header = {"Authorization": f"Bearer {token}"}
-    response = requests.request("GET", filter_url, headers=header)
+    response = requests.get(filter_url)
     response.raise_for_status()
     data = response.json()
     assert data["total"] == 1, f"More than one dataset found with title '{layer_name}'."
