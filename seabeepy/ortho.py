@@ -276,9 +276,16 @@ def check_file_count(dir_path):
 
 
 def is_publish_ready(dir_path):
-    """Check if a NodeODM result is ready to publish. Returns True if 'odm_orthophoto.original.tif'
-    exists, but f'{mission_name}.tif' does not. This implies the ODM result is ready for further
-    processing and publishing, if desired.
+    """Check if an original orthophoto is ready to publish. The original orthophoto must be
+    in the 'orthophoto' subdirectory and named either 'odm_orthophoto.original.tif' (for
+    mosaics generated using NodeODM) or 'pix4d_orthophoto.original.tif' (for mosaics generated
+    using Pix4D).
+
+    If an original orthophoto exists, but a standardised version named f'{mission_name}.tif'
+    does not, the folder is considered ready for further processing and publishing, if desired.
+
+    NOTE: If the folder contains originals from BOTH ODM and Pix4D, this function will return
+    False.
 
     Args
         dir_path: Str. Path to mission folder.
@@ -287,11 +294,19 @@ def is_publish_ready(dir_path):
         Bool. True if ready to publish, otherwise False.
     """
     mission_name = os.path.split(dir_path)[-1]
-    if os.path.isfile(
+
+    odm_orig_exists = os.path.isfile(
         os.path.join(dir_path, "orthophoto", "odm_orthophoto.original.tif")
-    ) and not os.path.isfile(
+    )
+    pix4d_orig_exists = os.path.isfile(
+        os.path.join(dir_path, "orthophoto", "pix4d_orthophoto.original.tif")
+    )
+    cog_exists = os.path.isfile(
         os.path.join(dir_path, "orthophoto", f"{mission_name}.tif")
-    ):
+    )
+
+    # '^' is equivalent to XOR for Bools
+    if (odm_orig_exists ^ pix4d_orig_exists) and not cog_exists:
         return True
     else:
         return False
