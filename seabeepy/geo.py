@@ -3,20 +3,25 @@ import os
 import subprocess
 import time
 
+import pandas as pd
 import requests
 from geo.Geoserver import Geoserver
+
+from . import ortho, storage
 
 GEOSERVER_URL = r"https://geonode.seabee.sigma2.no/geoserver"
 GEONODE_URL = r"https://geonode.seabee.sigma2.no/api/v2/"
 
 
-def standardise_orthophoto(in_tif, out_tif, red_band=1, green_band=2, blue_band=3, nodata=255):
+def standardise_orthophoto(
+    in_tif, out_tif, red_band=1, green_band=2, blue_band=3, nodata=255
+):
     """Create a 3-band, cloud-optimised GeoTIFF ready for upload to GeoServer.
     This function is useful to ensure raster datasets uploaded to GeoServer are
     consistent, regardless of who produced them with which software.
 
     Builds an RGB composite from the specified bands from 'in_tif'. Bands are
-    converted to 8-bit (with value scaling), any alpha bands are removed and 
+    converted to 8-bit (with value scaling), any alpha bands are removed and
     existing overview layers are discarded and rebuilt. The file is saved using
     LZW compression.
 
@@ -27,7 +32,7 @@ def standardise_orthophoto(in_tif, out_tif, red_band=1, green_band=2, blue_band=
         red_band:   Int. Default 1. Band number for red band in 'in_tif'
         green_band: Int. Default 2. Band number for green band in 'in_tif'
         blue_band:  Int. Default 3. Band number for blue band in 'in_tif'
-        nodata:     Int. Default 255. Value to use for NoData. Typically 255 for 
+        nodata:     Int. Default 255. Value to use for NoData. Typically 255 for
                     seabirds and 0 for habitat mapping.
 
     Returns
@@ -38,8 +43,10 @@ def standardise_orthophoto(in_tif, out_tif, red_band=1, green_band=2, blue_band=
             raise ValueError(
                 "'red_band', 'green_band' and 'blue_band' must all be integers."
             )
-    
-    assert isinstance(nodata, int) and (0 <= nodata <= 255), "'nodata' must be an integer between 0 and 255."
+
+    assert isinstance(nodata, int) and (
+        0 <= nodata <= 255
+    ), "'nodata' must be an integer between 0 and 255."
 
     cmd = [
         "gdal_translate",
@@ -172,3 +179,33 @@ def update_geonode_metadata(layer_name, user, password, metadata):
     response.raise_for_status()
 
     return None
+
+
+def get_html_abstract(dir_path):
+    """Build an HTML abstract for GeoNode based on the mission folder name and data
+    in 'config.yaml'.
+
+    Args
+        dir_path: Str. Path to mission folder.
+
+    Returns
+        Str. HTML for abstract.
+    """
+    mission_name = os.path.split(dir_path)[-1]
+    group, area, date = ortho.parse_mission_data(mission_name)
+    config_data = ortho.parse_config(dir_path)
+
+    html = pd.DataFrame(
+        [
+            os.path.join(*storage._jhub_path_to_minio(dir_path)),
+            config_data["organisation"],
+            config_data["creator_name"],
+            config_data["theme"],
+            config_data["nfiles"],
+        ],
+        index=["MinIO path", "Organisation", "Creator", "Theme", "N images"],
+    ).to_html(header=None)
+
+    abstract = f"RGB mosaic collected by {config_data['organisation']} at {area} ({group}) on {date}.<br><br>{html}"
+
+    return abstract
