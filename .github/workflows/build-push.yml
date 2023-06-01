@@ -60,6 +60,6 @@ jobs:
       uses: docker/build-push-action@v2
       with:
         push: true
-        context: ${{ inputs.image_name }}
+        context: .
         file: ${{ inputs.image_name }}
         tags: ${{ steps.meta.outputs.tags }}
