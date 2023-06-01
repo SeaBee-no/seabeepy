@@ -86,6 +86,7 @@ def get_nodeodm_options(dir_path):
     Returns
         Dict of options to pass to NodeODM.
     """
+    # Full list of options here: https://docs.opendronemap.org/arguments/
     default_options = {
         "dsm": True,
         "dtm": True,
@@ -152,6 +153,7 @@ def check_config_valid(dir_path, verbose=False):
         Bool. True if 'config.yaml' is valid, else False..
     """
     # Define valid schema for 'config.yaml'
+    # Full list of options here: https://docs.opendronemap.org/arguments/
     schema = Schema(
         {
             "nfiles": And(int, lambda n: n > 0),
