@@ -94,7 +94,7 @@ def get_nodeodm_options(dir_path):
         "orthophoto-compression": "LZW",
         "orthophoto-resolution": 0.1,  # cm/pixel. If set very small, output will be auto-limited by data to max sensible value
         "dem-resolution": 0.1,  # cm/pixel. If set very small, output will be auto-limited by data to max sensible value
-        "max-concurrency": 16,
+        "max-concurrency": 32,
         "auto-boundary": True,
         "use-3dmesh": True,
         "fast-orthophoto": False,
