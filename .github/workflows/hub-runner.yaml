@@ -1,9 +1,13 @@
-name: Build JupyterHub 'main' environment
+name: Build Flight runner image
 
 on:
   push:
     branches:
       - main
+    paths:
+      - 'seabeepy/**'
+      - 'notebooks/**'
+      - 'scripts/**'
 jobs:
   build-push:
     name: hub-runner
