@@ -4,11 +4,6 @@ on:
   push:
     branches:
       - main
-    paths:
-      - '.github/workflows/hub-runner.yml'
-      - 'seabeepy/**'
-      - 'notebooks/**'
-      - 'scripts/**'
 jobs:
   build-push:
     name: hub-runner
