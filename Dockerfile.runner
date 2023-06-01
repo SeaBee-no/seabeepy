@@ -1,0 +1,30 @@
+FROM osgeo/gdal:ubuntu-small-3.6.3
+
+RUN apt-get update -qq && apt-get -y --no-install-recommends install \
+    python3-pip \
+    git &&\    
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+RUN pip install jupyter
+COPY requirements.txt .
+RUN pip install  -r requirements.txt
+
+COPY README.md setup.py seabeepy ./
+RUN pip install .
+
+RUN groupadd -g "1001" notebook \
+  && useradd --create-home --no-log-init -u "1001" -g "1001" notebook
+
+USER notebook
+ENV PATH "$PATH:/home/notebook/.local/bin"
+RUN curl https://dl.min.io/client/mc/release/linux-amd64/mc --create-dirs -o /home/notebook/.local/bin/mc
+RUN chmod +x /home/notebook/.local/bin/mc
+WORKDIR /home/notebook
+RUN mkdir cogs
+
+COPY scripts/runner.sh notebooks/* ./
+
+ENTRYPOINT [ "./runner.sh" ]
+
