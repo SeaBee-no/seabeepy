@@ -61,5 +61,5 @@ jobs:
       with:
         push: true
         context: .
-        file: ${{ inputs.image_name }}
+        file: ${{ inputs.file }}
         tags: ${{ steps.meta.outputs.tags }}
