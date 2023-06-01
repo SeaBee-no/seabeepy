@@ -9,7 +9,6 @@ on:
       - 'seabeepy/**'
       - 'notebooks/**'
       - 'scripts/**'
-
 jobs:
   build-push:
     name: hub-runner
