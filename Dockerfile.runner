@@ -24,7 +24,7 @@ RUN chmod +x /home/notebook/.local/bin/mc
 WORKDIR /home/notebook
 RUN mkdir cogs
 
-COPY scripts/runner.sh notebooks/* ./
+COPY --chown=1001:1001 scripts/runner.sh notebooks/* ./
 
 ENTRYPOINT [ "./runner.sh" ]
 
