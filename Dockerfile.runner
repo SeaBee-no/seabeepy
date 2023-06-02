@@ -18,7 +18,7 @@ RUN mkdir cogs
 RUN pip install jupyter
 COPY requirements.txt .
 RUN pip install  -r requirements.txt
-COPY seabeepy ./
+COPY seabeepy ./seabeepy
 
 COPY --chown=1001:1001 scripts/runner.sh notebooks/* ./
 
