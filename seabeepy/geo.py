@@ -199,7 +199,7 @@ def get_html_abstract(dir_path):
         [
             os.path.join(*storage._jhub_path_to_minio(dir_path)),
             config_data["organisation"],
-            config_data["creator_name"],
+            config_data.get("creator_name", ""),
             config_data["theme"],
             config_data["nfiles"],
         ],

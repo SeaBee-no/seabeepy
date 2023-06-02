@@ -158,10 +158,10 @@ def check_config_valid(dir_path, verbose=False):
         {
             "nfiles": And(int, lambda n: n > 0),
             "organisation": str,
-            "creator_name": str,
             "mosaic": bool,
             "publish": bool,
             "theme": lambda s: s in ("Seabirds", "Mammals", "Habitat"),
+            Optional("creator_name"): Or(str, None),
             Optional("project"): Or(str, None),
             Optional("odm_options"): {
                 Optional("dsm"): bool,
