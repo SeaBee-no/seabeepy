@@ -175,8 +175,10 @@ def check_config_valid(dir_path, verbose=False):
                 Optional("auto-boundary"): bool,
                 Optional("use-3dmesh"): bool,
                 Optional("fast-orthophoto"): bool,
+                Optional("pc-rectify"): bool,
                 Optional("split"): int,
                 Optional("split-overlap"): int,
+                Optional("crop"): And(Or(int, float), lambda x: x >= 0),
                 Optional("pc-quality"): lambda s: s
                 in ("ultra", "high", "medium", "low", "lowest"),
                 Optional("feature-quality"): lambda s: s
