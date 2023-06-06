@@ -201,11 +201,13 @@ def check_config_valid(dir_path, verbose=False):
     return True
 
 
-def parse_mission_data(mission_name):
+def parse_mission_data(mission_name, verbose=False):
     """Extract grouping, area and date from folder name.
 
     Args
         mission_name: Str. Name of mission folder
+        verbose:      Bool. Default False. Whether to print error details
+                      if file is not valid
 
     Returns
         Tuple or Bool. (group, area, date) if name can be parsed, else False.
@@ -213,7 +215,8 @@ def parse_mission_data(mission_name):
     try:
         group, area, date = mission_name.split("_")
     except ValueError:
-        print("Could not parse mission name. Expected (grouping_area_date).")
+        if verbose:
+            print(f"Could not parse '{mission_name}'. Expected (grouping_area_date).")
 
         return False
 
@@ -223,7 +226,10 @@ def parse_mission_data(mission_name):
         try:
             date = dt.datetime.strptime(date, "%Y%m%d%H%M")
         except ValueError:
-            print("Could not parse date. Expected 'yyyymmdd' or 'yyyymmddHHMM.")
+            if verbose:
+                print(
+                    f"Could not parse date '{date}'. Expected 'yyyymmdd' or 'yyyymmddHHMM."
+                )
 
             return False
 
@@ -246,12 +252,14 @@ def parse_config(dir_path):
     return data
 
 
-def check_file_count(dir_path):
+def check_file_count(dir_path, verbose=False):
     """Count the number of files in 'image_fold' and check it agrees with
     the value in 'config.yaml'.
 
     Args
         dir_path: Str. Path to mission folder.
+        verbose:  Bool. Default False. Whether to print error details if file
+                  is not valid
 
     Returns
         Bool. True if count agrees, else False.
@@ -273,7 +281,10 @@ def check_file_count(dir_path):
     if nfiles_found == nfiles_expected:
         return True
     else:
-        print("Number of files in 'images' does not match the value in 'config.yaml'.")
+        if verbose:
+            print(
+                f"Number of files in 'images' ({nfiles_found}) does not match the value in 'config.yaml' ({nfiles_expected})."
+            )
         return False
 
 
