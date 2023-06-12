@@ -19,6 +19,9 @@ def minio_login(user, password):
         key=user,
         secret=password,
         endpoint_url="https://storage.seabee.sigma2.no",
+        config_kwargs={
+            "read_timeout": 300,
+        },
     )
 
     return client
