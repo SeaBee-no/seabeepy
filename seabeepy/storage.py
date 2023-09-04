@@ -27,29 +27,33 @@ def minio_login(user, password):
     return client
 
 
-def _jhub_path_to_minio(abs_path):
+def _jhub_path_to_minio(abs_path: str):
     """For files on MinIO (i.e. everything within the 'shared-seabee-ns9879k' folder
     on JuyterHub), converts an absolute file path from JupyterHub into a bucket name
     and object name (for use with the MinIO client).
 
     Args
         abs_path: Str. Absolute path from JupyterHub to a file or folder on MinIO
-                  (i.e. within the 'shared-seabee-ns9879k' folder)
+                  (i.e. within the 'shared-seabee-ns9879k' folder) or absolute path
+                  to a minio location
 
     Returns
         Tuple of strings (bucket_name, object_name) if file is on MinIO, else
         (None, None).
     """
-    abs_path = Path(abs_path)
-    try:
-        bucket_idx = abs_path.parts.index("shared-seabee-ns9879k") + 1
-        bucket_name = abs_path.parts[bucket_idx]
-        obj_name = "/".join(abs_path.parts[bucket_idx + 1 :])
+    bucket_idx = 0
+    path_parts = [p for p in abs_path.split("/") if p]
+
+    if abs_path.startswith("/home/notebook/shared-seabee-ns9879k"):
+        bucket_idx = path_parts.index("shared-seabee-ns9879k") + 1
+
+    if len(path_parts) > 1:
+        bucket_name = path_parts[bucket_idx]
+        obj_name = "/".join(path_parts[bucket_idx + 1 :])
 
         return (bucket_name, obj_name)
 
-    except ValueError:
-        return (None, None)
+    return (None, None)
 
 
 def copy_file(src_path, dst_path, client, overwrite=False):
@@ -199,7 +203,7 @@ def copy_folder(src_fold, dst_fold, client, overwrite=False, containing_folder=T
     return result
 
 
-def copy_nodeodm_results(task_id, mission_fold, client):
+def copy_nodeodm_results(task_id: str, mission_fold: str, client: s3fs.S3FileSystem) -> bool:
     """NodeODM stores its results in the 'nodeodm-workdir' on MinIO within a folder
     named according to the task's unique ID. This function copies results back to the
     mission folder. This is important as NodeODM periodically deletes everything in
@@ -211,10 +215,11 @@ def copy_nodeodm_results(task_id, mission_fold, client):
         client:       Obj. Active MinIO Python client (from the 'minio_login' function)
 
     Returns
-        None. Results are copied.
+        is_copied:    Bool. If mission bucket orthophoto path is created
     """
-    nodeodm_workdir = r"/home/notebook/shared-seabee-ns9879k/nodeodm-workdir"
-    res_fold = os.path.join(nodeodm_workdir, task_id)
+    nodeodm_bucket = "nodeodm-workdir"
+    task_path = f"{nodeodm_bucket}/{task_id}"
+    mission_bucket, _ = _jhub_path_to_minio(mission_fold)
 
     # Copy folders into agreed structure within the mission folder
     fold_dict = {
@@ -229,10 +234,12 @@ def copy_nodeodm_results(task_id, mission_fold, client):
         "odm_texturing_25d": ("other", True),
         "opensfm": ("other", True),
     }
+
     for src, (dst, containing_folder) in fold_dict.items():
-        src_fold = os.path.join(res_fold, src)
+        src_fold = os.path.join(task_path, src)
         dst_fold = os.path.join(mission_fold, dst)
-        if os.path.isdir(src_fold):
+        if client.isdir(src_fold):
+            print(f"Copying to {dst_fold}")
             copy_folder(
                 src_fold,
                 dst_fold,
@@ -252,9 +259,10 @@ def copy_nodeodm_results(task_id, mission_fold, client):
         "task_output.txt": "report",
     }
     for src, dst in file_dict.items():
-        src_path = os.path.join(res_fold, src)
+        src_path = os.path.join(task_path, src)
         dst_path = os.path.join(mission_fold, dst, src)
-        if os.path.isfile(src_path):
+        if client.isfile(src_path):
+            print(f"Copying to {dst_fold}/{src}")
             copy_file(src_path, dst_path, client, overwrite=False)
 
-    return None
+    return client.isdir(f"{mission_bucket}/orthophoto")
