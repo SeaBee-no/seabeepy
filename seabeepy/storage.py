@@ -43,9 +43,12 @@ def _jhub_path_to_minio(abs_path: str):
     """
     bucket_idx = 0
     path_parts = [p for p in abs_path.split("/") if p]
-
-    if abs_path.startswith("/home/notebook/shared-seabee-ns9879k"):
+    
+    if "shared-seabee-ns9879k" in path_parts:
         bucket_idx = path_parts.index("shared-seabee-ns9879k") + 1
+
+    elif abs_path.startswith("/home/notebook"):
+        return (None, None)
 
     if len(path_parts) > 1:
         bucket_name = path_parts[bucket_idx]
