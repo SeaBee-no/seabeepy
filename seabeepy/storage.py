@@ -219,7 +219,7 @@ def copy_nodeodm_results(task_id: str, mission_fold: str, client: s3fs.S3FileSys
     """
     nodeodm_bucket = "nodeodm-workdir"
     task_path = f"{nodeodm_bucket}/{task_id}"
-    mission_bucket, _ = _jhub_path_to_minio(mission_fold)
+    mission_root = "/".join(_jhub_path_to_minio(mission_fold))
 
     # Copy folders into agreed structure within the mission folder
     fold_dict = {
@@ -265,4 +265,4 @@ def copy_nodeodm_results(task_id: str, mission_fold: str, client: s3fs.S3FileSys
             print(f"Copying to {dst_fold}/{src}")
             copy_file(src_path, dst_path, client, overwrite=False)
 
-    return client.isdir(f"{mission_bucket}/orthophoto")
+    return client.isdir(f"{mission_root}/orthophoto")
