@@ -8,22 +8,28 @@ from schema import And, Optional, Or, Schema, SchemaError
 from tqdm.notebook import tqdm
 
 
-def list_images(image_folder, ext="JPG", verbose=True):
+def list_images(image_folder, ext="jpg", verbose=True):
     """Return a list of all images in 'image_fold' with file extension 'ext'.
-    Does NOT search the folder recursively. If verbose is True, prints the
-    number of images and the total size on disk.
+    The search ignores case in the extention, so 'ext="jpg"' will find both
+    .jpg and .JPG files. Does NOT search the folder recursively. If verbose
+    is True, prints the number of images and the total size on disk.
 
     Args
         image_folder: Str. Folder path to search.
-        ext:          Str. Default 'JPG'. Type of files to search for.
+        ext:          Str. Default 'jpg'. Type of files to search for.
         verbose:      Bool. Default True. If True, prints the number of files
                       identified and their total size on disk
 
     Returns
         List of image paths.
     """
+    ext = ext.lower()
     image_folder = Path(image_folder)
-    image_files = list(image_folder.glob(f"*.{ext}"))
+    image_files = [
+        img_path
+        for img_path in image_folder.glob("*")
+        if img_path.suffix.lower() == f".{ext}"
+    ]
     images_size = sum(f.stat().st_size for f in image_files) / 1e9
     if verbose:
         print(
