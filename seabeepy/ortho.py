@@ -84,7 +84,7 @@ def get_nodeodm_tasks(node_client):
 
 
 def get_nodeodm_options(dir_path):
-    """Update default NodeODM options with those specified by the user in 'config.yaml'.
+    """Update default NodeODM options with those specified by the user in 'config.seabee.yaml'.
 
     Args
         dir_path: Str. Path to flight directory
@@ -117,15 +117,15 @@ def get_nodeodm_options(dir_path):
 
 
 def check_config_exists(dir_path):
-    """Check whether file 'config.yaml' exists within 'dir_path'.
+    """Check whether file 'config.seabee.yaml' exists within 'dir_path'.
 
     Args
         dir_path: Str. Path to flight directory
 
     Returns
-        Bool. True if 'config.yaml' exists, else False.
+        Bool. True if 'config.seabee.yaml' exists, else False.
     """
-    if os.path.isfile(os.path.join(dir_path, "config.yaml")):
+    if os.path.isfile(os.path.join(dir_path, "config.seabee.yaml")):
         return True
     else:
         return False
@@ -148,7 +148,7 @@ def check_subdir_exists(dir_path, subdir):
 
 
 def check_config_valid(dir_path, verbose=False):
-    """Check that information contained in 'config.yaml' can be parsed correctly.
+    """Check that information contained in 'config.seabee.yaml' can be parsed correctly.
 
     Args
         dir_path: Str. Path to flight directory
@@ -156,17 +156,30 @@ def check_config_valid(dir_path, verbose=False):
                   valid
 
     Returns
-        Bool. True if 'config.yaml' is valid, else False..
+        Bool. True if 'config.seabee.yaml' is valid, else False.
     """
-    # Define valid schema for 'config.yaml'
-    # Full list of options here: https://docs.opendronemap.org/arguments/
+    # Define valid schema for 'config.seabee.yaml'
+    # Full list of ODM options here: https://docs.opendronemap.org/arguments/
     schema = Schema(
         {
+            "grouping": str,
+            "area": str,
+            "datetime": And(
+                str,
+                Or(
+                    lambda date: dt.datetime.strptime(date, "%Y%m%d"),
+                    lambda date: dt.datetime.strptime(date, "%Y%m%d%H%M"),
+                ),
+            ),
             "nfiles": And(int, lambda n: n > 0),
             "organisation": str,
             "mosaic": bool,
             "publish": bool,
-            "theme": lambda s: s in ("Seabirds", "Mammals", "Habitat"),
+            "theme": lambda s: s.lower() in ("seabirds", "mammals", "habitat"),
+            Optional("spectrum_type"): Or(
+                lambda s: s.lower() in ("rgb", "ms", "hsi"), None
+            ),
+            Optional("elevation"): Or(And(int, lambda x: x >= 0), None),
             Optional("creator_name"): Or(str, None),
             Optional("project"): Or(str, None),
             Optional("odm_options"): {
@@ -193,15 +206,12 @@ def check_config_valid(dir_path, verbose=False):
         }
     )
 
-    config_path = os.path.join(dir_path, "config.yaml")
-    with open(config_path, "r") as stream:
-        data = yaml.safe_load(stream)
-
+    data = parse_config(dir_path)
     try:
         schema.validate(data)
     except SchemaError as e:
         if verbose:
-            print("Could not parse 'config.yaml':")
+            print("Could not parse 'config.seabee.yaml':")
             print(e)
 
         return False
@@ -209,43 +219,37 @@ def check_config_valid(dir_path, verbose=False):
     return True
 
 
-def parse_mission_data(mission_name, verbose=False):
-    """Extract grouping, area and date from folder name.
+def parse_mission_data(dir_path, parse_date=False):
+    """Extract basic mission info from 'config.seabee.yaml'.
 
     Args
-        mission_name: Str. Name of mission folder
-        verbose:      Bool. Default False. Whether to print error details
-                      if file is not valid
+        dir_path:   Str. Path to flight directory
+        parse_date: Bool. Default False. Whether to convert the datetime
+                    string to a datetime object
 
     Returns
-        Tuple or Bool. (group, area, date) if name can be parsed, else False.
+        Tuple (group, area, date, spec, elev), where 'spec' and 'elev'
+        will be None if not provided.
     """
-    try:
-        group, area, date = mission_name.split("_")
-    except ValueError:
-        if verbose:
-            print(f"Could not parse '{mission_name}'. Expected (grouping_area_date).")
+    # Data already validated by 'check_config_valid', so just extract parts
+    data = parse_config(dir_path)
+    group = data["grouping"]
+    area = data["area"]
+    date = data["datetime"]
+    spec = data.get("spectrum_type")
+    elev = data.get("elevation")
 
-        return False
-
-    try:
-        date = dt.datetime.strptime(date, "%Y%m%d")
-    except ValueError:
+    if parse_date:
         try:
-            date = dt.datetime.strptime(date, "%Y%m%d%H%M")
+            date = dt.datetime.strptime(date, "%Y%m%d")
         except ValueError:
-            if verbose:
-                print(
-                    f"Could not parse date '{date}'. Expected 'yyyymmdd' or 'yyyymmddHHMM."
-                )
+            date = dt.datetime.strptime(date, "%Y%m%d%H%M")
 
-            return False
-
-    return (group, area, date)
+    return (group, area, date, spec, elev)
 
 
 def parse_config(dir_path):
-    """Parse 'config.yaml'.
+    """Parse 'config.seabee.yaml'.
 
     Args
         dir_path: Str. Path to mission folder.
@@ -253,16 +257,39 @@ def parse_config(dir_path):
     Returns
         Dict.
     """
-    config_path = os.path.join(dir_path, "config.yaml")
+    config_path = os.path.join(dir_path, "config.seabee.yaml")
     with open(config_path, "r") as stream:
         data = yaml.safe_load(stream)
 
     return data
 
 
+def get_layer_name(dir_path):
+    """Build layer name for GeoServer from basic mission info in 'config.seabee.yaml'.
+
+    Args
+        dir_path: Str. Path to flight directory
+
+    Returns
+        Str 'group_area_date_[spec]_[elev]' where 'spec' and 'elev' are optional.
+        Any spaces in the name will be replaced by '-'.
+    """
+    group, area, date, spec, elev = parse_mission_data(dir_path, parse_date=False)
+    layer_name = "_".join((group, area, date))
+
+    if spec:
+        layer_name += f"_{spec}"
+    if elev:
+        layer_name += f"_{elev}m"
+
+    layer_name = layer_name.replace(" ", "-")
+
+    return layer_name
+
+
 def check_file_count(dir_path, verbose=False):
     """Count the number of files in 'image_fold' and check it agrees with
-    the value in 'config.yaml'.
+    the value in 'config.seabee.yaml'.
 
     Args
         dir_path: Str. Path to mission folder.
@@ -280,18 +307,14 @@ def check_file_count(dir_path, verbose=False):
             if os.path.isfile(os.path.join(image_fold, name))
         ]
     )
-
-    config_path = os.path.join(dir_path, "config.yaml")
-    with open(config_path, "r") as stream:
-        data = yaml.safe_load(stream)
+    data = parse_config(dir_path)
     nfiles_expected = data["nfiles"]
-
     if nfiles_found == nfiles_expected:
         return True
     else:
         if verbose:
             print(
-                f"Number of files in 'images' ({nfiles_found}) does not match the value in 'config.yaml' ({nfiles_expected})."
+                f"Number of files in 'images' ({nfiles_found}) does not match the value in 'config.seabee.yaml' ({nfiles_expected})."
             )
         return False
 
@@ -302,7 +325,7 @@ def is_publish_ready(dir_path):
     mosaics generated using NodeODM) or 'pix4d_orthophoto.original.tif' (for mosaics generated
     using Pix4D).
 
-    If an original orthophoto exists, but a standardised version named f'{mission_name}.tif'
+    If an original orthophoto exists, but a standardised version named f'{layer_name}.tif'
     does not, the folder is considered ready for further processing and publishing, if desired.
 
     NOTE: If the folder contains originals from BOTH ODM and Pix4D, this function will return
@@ -314,7 +337,7 @@ def is_publish_ready(dir_path):
     Returns
         Bool. True if ready to publish, otherwise False.
     """
-    mission_name = os.path.split(dir_path)[-1]
+    layer_name = get_layer_name(dir_path)
 
     odm_orig_exists = os.path.isfile(
         os.path.join(dir_path, "orthophoto", "odm_orthophoto.original.tif")
@@ -323,7 +346,7 @@ def is_publish_ready(dir_path):
         os.path.join(dir_path, "orthophoto", "pix4d_orthophoto.original.tif")
     )
     cog_exists = os.path.isfile(
-        os.path.join(dir_path, "orthophoto", f"{mission_name}.tif")
+        os.path.join(dir_path, "orthophoto", f"{layer_name}.tif")
     )
 
     # '^' is equivalent to XOR for Bools
