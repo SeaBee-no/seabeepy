@@ -5,6 +5,7 @@ geoserver-rest
 lxml>=4.9.2
 matplotlib
 minio
+numpy
 owslib
 pandas
 pydantic[dotenv]

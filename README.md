@@ -2,6 +2,17 @@
 
 A collection of useful Python functions for common SeaBee workflows. A bit of a random mixture at present, but will be tidied up as the workflow evolves.
 
+The package is primarily designed to be used on the SeaBee JupyterHub, but it can be installed locally, if you wish.
+
+## Local install
+
+`seabeepy` requires `gdal`, which must be installed and configured separately. It can then be installed using `pip`. The easiest way to install `gdal` is using Anaconda/Mamba:
+
+    mamba create --name seabee python=3.10 gdal
+    mamba activate seabee
+    pip install git+https://github.com/SeaBee-no/seabeepy.git
+    
+Note that `seabeepy` has been developed and tested on Linux and may not work as expected on Windows.
 
 ## Metadata
 
