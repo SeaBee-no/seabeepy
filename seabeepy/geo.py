@@ -78,8 +78,6 @@ def standardise_orthophoto(
     ]
     subprocess.check_call(cmd)
 
-    return None
-
 
 def upload_raster_to_geoserver(fpath, user, password, workspace="geonode"):
     """Upload a raster from JupyterHub to GeoServer. The layer name in
@@ -111,8 +109,6 @@ def upload_raster_to_geoserver(fpath, user, password, workspace="geonode"):
         path=fpath,
         workspace=workspace,
     )
-
-    return None
 
 
 def publish_to_geonode(layer_name, user, password, workspace="geonode", wait=10):
@@ -151,8 +147,6 @@ def publish_to_geonode(layer_name, user, password, workspace="geonode", wait=10)
         job_status = requests.get(job_url, auth=auth).json()["status"]
         time.sleep(wait)
 
-    return None
-
 
 def update_geonode_metadata(layer_name, user, password, metadata):
     """Update metadata for a layer published on GeoNode.
@@ -177,8 +171,6 @@ def update_geonode_metadata(layer_name, user, password, metadata):
     auth = (user, password)
     response = requests.patch(update_url, auth=auth, json=metadata)
     response.raise_for_status()
-
-    return None
 
 
 def get_html_abstract(dir_path):

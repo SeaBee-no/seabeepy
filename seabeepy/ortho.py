@@ -7,6 +7,54 @@ import yaml
 from schema import And, Optional, Or, Schema, SchemaError
 from tqdm.notebook import tqdm
 
+# Define valid schema for 'config.seabee.yaml'
+# Full list of ODM options here: https://docs.opendronemap.org/arguments/
+CONFIG_SCHEMA = Schema(
+    {
+        "grouping": str,
+        "area": str,
+        "datetime": And(
+            str,
+            Or(
+                lambda date: dt.datetime.strptime(date, "%Y%m%d"),
+                lambda date: dt.datetime.strptime(date, "%Y%m%d%H%M"),
+            ),
+        ),
+        "nfiles": And(int, lambda n: n > 0),
+        "organisation": str,
+        "mosaic": bool,
+        "publish": bool,
+        "theme": lambda s: s.lower() in ("seabirds", "mammals", "habitat"),
+        Optional("spectrum_type"): Or(
+            lambda s: s.lower() in ("rgb", "ms", "hsi"), None
+        ),
+        Optional("elevation"): Or(And(int, lambda x: x >= 0), None),
+        Optional("creator_name"): Or(str, None),
+        Optional("project"): Or(str, None),
+        Optional("odm_options"): {
+            Optional("dsm"): bool,
+            Optional("dtm"): bool,
+            Optional("cog"): bool,
+            Optional("orthophoto-compression"): lambda s: s
+            in ("JPEG", "LZW", "PACKBITS", "DEFLATE", "LZMA", "NONE"),
+            Optional("orthophoto-resolution"): Or(int, float),
+            Optional("dem-resolution"): Or(int, float),
+            Optional("max-concurrency"): int,
+            Optional("auto-boundary"): bool,
+            Optional("use-3dmesh"): bool,
+            Optional("fast-orthophoto"): bool,
+            Optional("pc-rectify"): bool,
+            Optional("split"): int,
+            Optional("split-overlap"): int,
+            Optional("crop"): And(Or(int, float), lambda x: x >= 0),
+            Optional("pc-quality"): lambda s: s
+            in ("ultra", "high", "medium", "low", "lowest"),
+            Optional("feature-quality"): lambda s: s
+            in ("ultra", "high", "medium", "low", "lowest"),
+        },
+    }
+)
+
 
 def list_images(image_folder, ext="jpg", verbose=True):
     """Return a list of all images in 'image_fold' with file extension 'ext'.
@@ -158,57 +206,9 @@ def check_config_valid(dir_path, verbose=False):
     Returns
         Bool. True if 'config.seabee.yaml' is valid, else False.
     """
-    # Define valid schema for 'config.seabee.yaml'
-    # Full list of ODM options here: https://docs.opendronemap.org/arguments/
-    schema = Schema(
-        {
-            "grouping": str,
-            "area": str,
-            "datetime": And(
-                str,
-                Or(
-                    lambda date: dt.datetime.strptime(date, "%Y%m%d"),
-                    lambda date: dt.datetime.strptime(date, "%Y%m%d%H%M"),
-                ),
-            ),
-            "nfiles": And(int, lambda n: n > 0),
-            "organisation": str,
-            "mosaic": bool,
-            "publish": bool,
-            "theme": lambda s: s.lower() in ("seabirds", "mammals", "habitat"),
-            Optional("spectrum_type"): Or(
-                lambda s: s.lower() in ("rgb", "ms", "hsi"), None
-            ),
-            Optional("elevation"): Or(And(int, lambda x: x >= 0), None),
-            Optional("creator_name"): Or(str, None),
-            Optional("project"): Or(str, None),
-            Optional("odm_options"): {
-                Optional("dsm"): bool,
-                Optional("dtm"): bool,
-                Optional("cog"): bool,
-                Optional("orthophoto-compression"): lambda s: s
-                in ("JPEG", "LZW", "PACKBITS", "DEFLATE", "LZMA", "NONE"),
-                Optional("orthophoto-resolution"): Or(int, float),
-                Optional("dem-resolution"): Or(int, float),
-                Optional("max-concurrency"): int,
-                Optional("auto-boundary"): bool,
-                Optional("use-3dmesh"): bool,
-                Optional("fast-orthophoto"): bool,
-                Optional("pc-rectify"): bool,
-                Optional("split"): int,
-                Optional("split-overlap"): int,
-                Optional("crop"): And(Or(int, float), lambda x: x >= 0),
-                Optional("pc-quality"): lambda s: s
-                in ("ultra", "high", "medium", "low", "lowest"),
-                Optional("feature-quality"): lambda s: s
-                in ("ultra", "high", "medium", "low", "lowest"),
-            },
-        }
-    )
-
     data = parse_config(dir_path)
     try:
-        schema.validate(data)
+        CONFIG_SCHEMA.validate(data)
     except SchemaError as e:
         if verbose:
             print("Could not parse 'config.seabee.yaml':")
@@ -311,12 +311,13 @@ def check_file_count(dir_path, verbose=False):
     nfiles_expected = data["nfiles"]
     if nfiles_found == nfiles_expected:
         return True
-    else:
-        if verbose:
-            print(
-                f"Number of files in 'images' ({nfiles_found}) does not match the value in 'config.seabee.yaml' ({nfiles_expected})."
-            )
-        return False
+
+    if verbose:
+        print(
+            f"Number of files in 'images' ({nfiles_found}) does not match the value in 'config.seabee.yaml' ({nfiles_expected})."
+        )
+
+    return False
 
 
 def is_publish_ready(dir_path):
