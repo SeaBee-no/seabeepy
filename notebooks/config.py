@@ -8,7 +8,6 @@ class Settings(BaseSettings):
     GEOSERVER_PASSWORD: str
     GEONODE_USER: str
     GEONODE_PASSWORD: str
-    GEONODE_TOKEN: str
 
     class Config:
         case_sensitive = False
