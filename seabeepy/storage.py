@@ -43,7 +43,7 @@ def _jhub_path_to_minio(abs_path: str):
     """
     bucket_idx = 0
     path_parts = [p for p in abs_path.split("/") if p]
-    
+
     if "shared-seabee-ns9879k" in path_parts:
         bucket_idx = path_parts.index("shared-seabee-ns9879k") + 1
 
@@ -206,7 +206,9 @@ def copy_folder(src_fold, dst_fold, client, overwrite=False, containing_folder=T
     return result
 
 
-def copy_nodeodm_results(task_id: str, mission_fold: str, client: s3fs.S3FileSystem) -> bool:
+def copy_nodeodm_results(
+    task_id: str, mission_fold: str, client: s3fs.S3FileSystem
+) -> bool:
     """NodeODM stores its results in the 'nodeodm-workdir' on MinIO within a folder
     named according to the task's unique ID. This function copies results back to the
     mission folder. This is important as NodeODM periodically deletes everything in

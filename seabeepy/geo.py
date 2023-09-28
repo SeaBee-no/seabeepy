@@ -78,8 +78,6 @@ def standardise_orthophoto(
     ]
     subprocess.check_call(cmd)
 
-    return None
-
 
 def upload_raster_to_geoserver(fpath, user, password, workspace="geonode"):
     """Upload a raster from JupyterHub to GeoServer. The layer name in
@@ -94,7 +92,7 @@ def upload_raster_to_geoserver(fpath, user, password, workspace="geonode"):
         workspace: Str. Default 'geonode'. GeoServer workspace
 
     Returns
-        Str. Name of layer added to GeoServer.
+        None.
     """
     # Authenticate
     geo = Geoserver(
@@ -111,8 +109,6 @@ def upload_raster_to_geoserver(fpath, user, password, workspace="geonode"):
         path=fpath,
         workspace=workspace,
     )
-
-    return layer_name
 
 
 def publish_to_geonode(layer_name, user, password, workspace="geonode", wait=10):
@@ -151,8 +147,6 @@ def publish_to_geonode(layer_name, user, password, workspace="geonode", wait=10)
         job_status = requests.get(job_url, auth=auth).json()["status"]
         time.sleep(wait)
 
-    return None
-
 
 def update_geonode_metadata(layer_name, user, password, metadata):
     """Update metadata for a layer published on GeoNode.
@@ -178,12 +172,9 @@ def update_geonode_metadata(layer_name, user, password, metadata):
     response = requests.patch(update_url, auth=auth, json=metadata)
     response.raise_for_status()
 
-    return None
-
 
 def get_html_abstract(dir_path):
-    """Build an HTML abstract for GeoNode based on the mission folder name and data
-    in 'config.yaml'.
+    """Build an HTML abstract for GeoNode based on data in 'config.seabee.yaml'.
 
     Args
         dir_path: Str. Path to mission folder.
@@ -191,21 +182,38 @@ def get_html_abstract(dir_path):
     Returns
         Str. HTML for abstract.
     """
-    mission_name = os.path.split(dir_path)[-1]
-    group, area, date = ortho.parse_mission_data(mission_name)
+    group, area, date, spec, elev = ortho.parse_mission_data(dir_path, parse_date=True)
     config_data = ortho.parse_config(dir_path)
 
     html = pd.DataFrame(
         [
             os.path.join(*storage._jhub_path_to_minio(dir_path)),
+            group,
+            area,
+            date.strftime("%Y-%m-%d"),
+            config_data.get("spectrum_type", "-").upper(),
+            config_data.get("elevation", "-"),
             config_data["organisation"],
-            config_data.get("creator_name", ""),
-            config_data["theme"],
+            config_data.get("project", "-"),
+            config_data.get("creator_name", "-"),
+            config_data["theme"].capitalize(),
             config_data["nfiles"],
         ],
-        index=["MinIO path", "Organisation", "Creator", "Theme", "N images"],
+        index=[
+            "MinIO path",
+            "Grouping",
+            "Area",
+            "Flight date",
+            "Spectrum",
+            "Elevation (m)",
+            "Organisation",
+            "Project",
+            "Creator",
+            "Theme",
+            "N images",
+        ],
     ).to_html(header=None)
 
-    abstract = f"RGB mosaic collected by {config_data['organisation']} at {area} ({group}) on {date}.<br><br>{html}"
+    abstract = f"RGB mosaic collected by {config_data['organisation']} at {area} ({group}) on {date.strftime('%Y-%m-%d')}.<br><br>{html}"
 
     return abstract

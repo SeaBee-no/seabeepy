@@ -159,8 +159,6 @@ def class_definition_from_df(
     with open(fpath, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
 
-    return None
-
 
 def get_class_codes(class_def_path):
     """Build a dataframe of class labels from an ArcGIS Pro class definition
