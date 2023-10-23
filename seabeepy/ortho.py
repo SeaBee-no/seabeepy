@@ -56,17 +56,18 @@ CONFIG_SCHEMA = Schema(
 )
 
 
-def list_images(image_folder, ext="jpg", verbose=True):
+def list_images(image_folder, ext="jpg", verbose=True, check_folders=True):
     """Return a list of all images in 'image_fold' with file extension 'ext'.
     The search ignores case in the extention, so 'ext="jpg"' will find both
     .jpg and .JPG files. Does NOT search the folder recursively. If verbose
     is True, prints the number of images and the total size on disk.
 
     Args
-        image_folder: Str. Folder path to search.
-        ext:          Str. Default 'jpg'. Type of files to search for.
-        verbose:      Bool. Default True. If True, prints the number of files
-                      identified and their total size on disk
+        image_folder:  Str. Folder path to search.
+        ext:           Str. Default 'jpg'. Type of files to search for.
+        verbose:       Bool. Default True. If True, prints the number of files
+                       identified and their total size on disk
+        check_folders: Bool. Check for images in subfolders at depth 1
 
     Returns
         List of image paths.
@@ -78,6 +79,12 @@ def list_images(image_folder, ext="jpg", verbose=True):
         for img_path in image_folder.glob("*")
         if img_path.suffix.lower() == f".{ext}"
     ]
+    if check_folders:
+        image_files.extend([
+        img_path
+        for img_path in image_folder.glob("*/*")
+        if img_path.suffix.lower() == f".{ext}"
+    ])
     images_size = sum(f.stat().st_size for f in image_files) / 1e9
     if verbose:
         print(
