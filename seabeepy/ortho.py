@@ -51,6 +51,9 @@ CONFIG_SCHEMA = Schema(
             in ("ultra", "high", "medium", "low", "lowest"),
             Optional("feature-quality"): lambda s: s
             in ("ultra", "high", "medium", "low", "lowest"),
+            Optional("radiometric-calibration"): Or(
+                lambda s: s in ("camera", "camera+sun"), None
+            ),
         },
     }
 )
