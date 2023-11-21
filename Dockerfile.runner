@@ -1,4 +1,4 @@
-FROM osgeo/gdal:ubuntu-small-3.6.3
+FROM osgeo/gdal:ubuntu-small-3.6.3 as gdalubuntu
 
 RUN apt-get update -qq && apt-get -y --no-install-recommends install \
     python3-pip \
@@ -7,6 +7,20 @@ RUN apt-get update -qq && apt-get -y --no-install-recommends install \
 
 RUN groupadd -g "1001" notebook \
   && useradd --create-home --no-log-init -u "1001" -g "1001" notebook
+
+FROM europe-west1-docker.pkg.dev/seabee/images/nrseabee-builder:2039d33 as nrbuilder
+
+# Install nrseabee package ========================================================================
+COPY --from=nrbuilder --chown=notebook  /tmp/seabee /tmp/seabee
+COPY --from=nrbuilder --chown=notebook /opt/minio /opt/minio
+COPY --from=nrbuilder --chown=notebook /opt/yq /opt/yq
+
+RUN python -m pip install --no-cache-dir /tmp/seabee
+
+ENV PATH /opt/venv/bin:/opt/yq/bin:/opt/minio/bin:${PATH}
+
+
+FROM gdalubuntu
 
 USER notebook
 ENV PATH "$PATH:/home/notebook/.local/bin"
