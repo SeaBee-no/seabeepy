@@ -9,16 +9,10 @@ RUN groupadd -g "1001" notebook \
   && useradd --create-home --no-log-init -u "1001" -g "1001" notebook
 
 FROM europe-west1-docker.pkg.dev/seabee/images/nrseabee-builder:2039d33 as nrbuilder
-
-# Install nrseabee package ========================================================================
+# Install nrseabee package
 COPY --from=nrbuilder --chown=notebook  /tmp/seabee /tmp/seabee
-
 RUN python -m pip install --no-cache-dir /tmp/seabee
-
 ENV PATH /opt/venv/bin:${PATH}
-
-
-FROM gdalubuntu
 
 USER notebook
 ENV PATH "$PATH:/home/notebook/.local/bin"
