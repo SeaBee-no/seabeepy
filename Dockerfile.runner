@@ -12,12 +12,10 @@ FROM europe-west1-docker.pkg.dev/seabee/images/nrseabee-builder:2039d33 as nrbui
 
 # Install nrseabee package ========================================================================
 COPY --from=nrbuilder --chown=notebook  /tmp/seabee /tmp/seabee
-COPY --from=nrbuilder --chown=notebook /opt/minio /opt/minio
-COPY --from=nrbuilder --chown=notebook /opt/yq /opt/yq
 
 RUN python -m pip install --no-cache-dir /tmp/seabee
 
-ENV PATH /opt/venv/bin:/opt/yq/bin:/opt/minio/bin:${PATH}
+ENV PATH /opt/venv/bin:${PATH}
 
 
 FROM gdalubuntu
