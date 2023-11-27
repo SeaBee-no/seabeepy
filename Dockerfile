@@ -1,14 +1,14 @@
-FROM osgeo/gdal:ubuntu-small-3.6.3
+FROM --platform=linux/amd64 europe-west1-docker.pkg.dev/seabee/images/nrseabee-builder:2039d33 as nrbuilder
+FROM osgeo/gdal:ubuntu-small-3.6.3 as base
 
 RUN apt-get update -qq && apt-get -y --no-install-recommends install \
     python3-pip \
-    git &&\    
+    git &&\
     rm -rf /var/lib/apt/lists/*
 
 RUN groupadd -g "1001" notebook \
   && useradd --create-home --no-log-init -u "1001" -g "1001" notebook
 
-FROM europe-west1-docker.pkg.dev/seabee/images/nrseabee-builder:2039d33 as nrbuilder
 # Install nrseabee package
 COPY --from=nrbuilder --chown=notebook  /tmp/seabee /tmp/seabee
 RUN python -m pip install --no-cache-dir /tmp/seabee
