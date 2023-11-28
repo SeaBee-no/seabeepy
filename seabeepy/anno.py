@@ -4,9 +4,10 @@ import os
 import random
 
 import geopandas as gpd
-import pandas as pd
 import matplotlib.pyplot as plt
+import pandas as pd
 import rasterio
+import requests
 from rasterio import features
 
 
@@ -160,39 +161,48 @@ def class_definition_from_df(
         json.dump(data, f, ensure_ascii=False, indent=4)
 
 
-def get_class_codes(class_def_path):
-    """Build a dataframe of class labels from an ArcGIS Pro class definition
-    file (.ecs). Assume a three-level hierarchical class definition file,
-    originally created from Excel using 'class_definition_from_df'.
-    Returns a dataframe with the codes and names for each level in the
-    .ecs file.
+def get_class_codes(url):
+    """Build a dataframe of class labels from an ArcGIS Pro class definition file (.ecs). hosted
+    on GitHub. Assumes a hierarchical class definition file originally created from Excel using
+    'class_definition_from_df'. Returns a dataframe with the codes, names and colours for each
+    level in the .ecs file.
+
     Args
-        class_def_path: Str. Path to class definition file (.ecs) created
-                        using 'class_definition_from_df'
+        url: Str. Raw URL of class definition file (.ecs) on GitHub created using
+            'class_definition_from_df'
+
     Returns
         Dataframe.
+
+    Raises
+        ValueError if URL does not end in '.ecs'.
     """
-    assert class_def_path.endswith(".ecs"), "'class_def_path' must be a '.ecs' file."
-    with open(class_def_path, "r") as f:
-        data = json.load(f)
+    if not url.endswith(".ecs"):
+        raise ValueError("'url' must be a '.ecs' file.")
+
+    response = requests.get(url)
+    if response.status_code != 200:
+        raise Exception(f"Failed to read URL: {response.status_code}")
+    data = json.loads(response.text)
 
     class_dict = {
         "code": [],
         "name": [],
         "desc": [],
+        "colour": [],
     }
-    for lev1_dict in data["classDefs"]:
-        class_dict["code"].append(lev1_dict["alias"])
-        class_dict["name"].append(lev1_dict["name"])
-        class_dict["desc"].append(lev1_dict["description"])
-        for lev2_dict in lev1_dict["subclasses"]:
-            class_dict["code"].append(lev2_dict["alias"])
-            class_dict["name"].append(lev2_dict["name"])
-            class_dict["desc"].append(lev2_dict["description"])
-            for lev3_dict in lev2_dict["subclasses"]:
-                class_dict["code"].append(lev3_dict["alias"])
-                class_dict["name"].append(lev3_dict["name"])
-                class_dict["desc"].append(lev3_dict["description"])
+
+    def process_subclasses(subclasses):
+        for subclass in subclasses:
+            class_dict["code"].append(subclass["alias"])
+            class_dict["name"].append(subclass["name"])
+            class_dict["desc"].append(subclass["description"])
+            class_dict["colour"].append(subclass["color"])
+            if "subclasses" in subclass:
+                process_subclasses(subclass["subclasses"])
+
+    # Recursively process levels in the ECS file
+    process_subclasses(data["classDefs"])
 
     df = pd.DataFrame(class_dict)
 
