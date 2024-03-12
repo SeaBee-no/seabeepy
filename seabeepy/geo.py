@@ -5,12 +5,12 @@ import time
 
 import pandas as pd
 import requests
-from geo.Geoserver import Geoserver
+from geo.Geoserver import Geoserver, GeoserverException
 
 from . import ortho, storage
 
-GEOSERVER_URL = r"https://geonode.seabee.sigma2.no/geoserver"
-GEONODE_URL = r"https://geonode.seabee.sigma2.no/api/v2/"
+GEOSERVER_URL = os.environ.get("GEOSERVER_URL", r"https://geonode.seabee.sigma2.no/geoserver")
+GEONODE_URL = os.environ.get("GEONODE_URL", r"https://geonode.seabee.sigma2.no/api/v2/")
 
 
 def standardise_orthophoto(
@@ -77,6 +77,43 @@ def standardise_orthophoto(
         out_tif,
     ]
     subprocess.check_call(cmd)
+
+
+def upload_geopackage_to_geoserver(fpath: str, user: str, password: str, workspace="geonode") -> str:
+    """Upload a geopackage from JupyterHub to GeoServer. The filename will be used
+    as datastore name while the layer in the file will be used as layer name
+
+    NOTE: Creation of the layer will be overwritten if it exist
+
+    Args
+        fpath:     Str. Path to geopackage dataset to be uploaded
+        user:      Str. GeoServer admin. user
+        password:  Str. GeoServer admin. password
+        workspace: Str. Default 'geonode'. GeoServer workspace
+
+    Returns
+        Str.
+    """
+
+    headers = {
+        "Content-type": "application/x-sqlite3",
+    }
+
+    store_name = os.path.splitext(os.path.basename(fpath))[0]
+    
+    url = f"{GEOSERVER_URL}/rest/workspaces/{workspace}/datastores/{store_name}/file.gpkg"
+
+    with open(fpath, "rb") as f:
+        r = requests.put(
+            url,
+            data=f.read(),
+            auth=(user, password),
+            headers=headers,
+        )
+    if r.status_code in [200, 201, 202]:
+        return store_name
+    else:
+        raise GeoserverException(r.status_code, r.content)
 
 
 def upload_raster_to_geoserver(fpath, user, password, workspace="geonode"):
