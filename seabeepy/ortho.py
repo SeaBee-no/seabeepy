@@ -366,3 +366,24 @@ def is_publish_ready(dir_path):
         return True
     else:
         return False
+
+
+def is_detection_ready(dir_path: str) -> bool:
+    """Check if an ortophoto is detection ready
+
+    Args
+        dir_path: Str. Path to mission folder.
+
+    Returns
+        Bool. True if ready to publish, otherwise False.
+    """
+    layer_name = get_layer_name(dir_path)
+
+    cog_exists = os.path.isfile(
+        os.path.join(dir_path, "orthophoto", f"{layer_name}.tif")
+    )
+
+    if cog_exists:
+        return True
+    else:
+        return False
