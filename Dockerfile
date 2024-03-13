@@ -1,4 +1,4 @@
-FROM --platform=linux/amd64 europe-west1-docker.pkg.dev/seabee/images/nrseabee-builder:2039d33 as nrbuilder
+FROM europe-west1-docker.pkg.dev/seabee/images/nrseabee-builder:2039d33 as nrbuilder
 FROM osgeo/gdal:ubuntu-small-3.6.3 as base
 
 RUN apt-get update -qq && apt-get -y --no-install-recommends install \
