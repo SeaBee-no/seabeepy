@@ -2,6 +2,7 @@ FROM europe-west1-docker.pkg.dev/seabee/images/nrseabee-builder:2039d33 as nrbui
 FROM osgeo/gdal:ubuntu-small-3.6.3 as base
 
 RUN apt-get update -qq && apt-get -y --no-install-recommends install \
+    ffmpeg libsm6 libxext6 \
     python3-pip \
     git &&\
     rm -rf /var/lib/apt/lists/*

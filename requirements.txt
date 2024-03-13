@@ -18,3 +18,5 @@ shapely
 tqdm
 xsdata>=21.9
 pydantic-settings
+torch
+torchvision
