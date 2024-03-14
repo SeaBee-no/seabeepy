@@ -22,7 +22,7 @@ RUN chmod +x /home/notebook/.local/bin/mc
 WORKDIR /home/notebook
 RUN mkdir cogs
 
-RUN pip install jupyter
+RUN pip install jupyter torch torchvision
 COPY requirements.txt .
 RUN pip install  -r requirements.txt
 COPY seabeepy ./seabeepy
