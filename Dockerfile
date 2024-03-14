@@ -1,12 +1,19 @@
-FROM osgeo/gdal:ubuntu-small-3.6.3
+FROM europe-west1-docker.pkg.dev/seabee/images/nrseabee-builder:2039d33 as nrbuilder
+FROM osgeo/gdal:ubuntu-small-3.6.3 as base
 
 RUN apt-get update -qq && apt-get -y --no-install-recommends install \
+    ffmpeg libsm6 libxext6 \
     python3-pip \
-    git &&\    
+    git &&\
     rm -rf /var/lib/apt/lists/*
 
 RUN groupadd -g "1001" notebook \
   && useradd --create-home --no-log-init -u "1001" -g "1001" notebook
+
+# Install nrseabee package
+COPY --from=nrbuilder --chown=notebook  /tmp/seabee /tmp/seabee
+RUN python -m pip install --no-cache-dir /tmp/seabee
+ENV PATH /opt/venv/bin:${PATH}
 
 USER notebook
 ENV PATH "$PATH:/home/notebook/.local/bin"
@@ -15,7 +22,7 @@ RUN chmod +x /home/notebook/.local/bin/mc
 WORKDIR /home/notebook
 RUN mkdir cogs
 
-RUN pip install jupyter
+RUN pip install jupyter torch torchvision
 COPY requirements.txt .
 RUN pip install  -r requirements.txt
 COPY seabeepy ./seabeepy
