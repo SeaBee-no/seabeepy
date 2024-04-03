@@ -4,6 +4,7 @@ import subprocess
 import time
 
 import pandas as pd
+import geopandas as gpd
 import requests
 from geo.Geoserver import Geoserver, GeoserverException
 
@@ -185,6 +186,23 @@ def publish_to_geonode(layer_name, user, password, workspace="geonode", wait=10)
         time.sleep(wait)
 
 
+def get_dataset_by_title(title):
+    """Get a dataset from GeoNode by title.
+
+    Args
+        title: Str. Title of dataset to search for.
+
+    Returns
+        Dict. Dataset information.
+    """
+    filter_url = GEONODE_URL + f"resources?search={title}&search_fields=title"
+    response = requests.get(filter_url)
+    response.raise_for_status()
+    data = response.json()
+    assert data["total"] == 1, f"More than one dataset found with title '{title}'."
+    return data["resources"][0]
+
+
 def update_geonode_metadata(layer_name, user, password, metadata):
     """Update metadata for a layer published on GeoNode.
 
@@ -197,12 +215,8 @@ def update_geonode_metadata(layer_name, user, password, metadata):
     Returns
         None. Metadata attributes are updated.
     """
-    filter_url = GEONODE_URL + f"resources?search={layer_name}&search_fields=title"
-    response = requests.get(filter_url)
-    response.raise_for_status()
-    data = response.json()
-    assert data["total"] == 1, f"More than one dataset found with title '{layer_name}'."
-    dataset_id = data["resources"][0]["pk"]
+
+    dataset_id = get_dataset_by_title(layer_name)["pk"]
 
     update_url = GEONODE_URL + f"datasets/{dataset_id}"
     auth = (user, password)
@@ -252,5 +266,33 @@ def get_html_abstract(dir_path):
     ).to_html(header=None)
 
     abstract = f"RGB mosaic collected by {config_data['organisation']} at {area} ({group}) on {date.strftime('%Y-%m-%d')}.<br><br>{html}"
+
+    return abstract
+
+
+def get_detection_abstract(gdf: gpd.GeoDataFrame, parent_layer_name: str,  model: str, jhub_path: str):
+    """Build an HTML abstract for GeoNode based on data in 'config.seabee.yaml' .
+
+    Args
+        dir_path: Str. Path to mission folder.
+        parent_layer_name: Str. Name of parent layer in GeoNode.
+        model:    Str. Name of model used for detection.
+        jhub_path: Str. jhub path to geopackage file on minio. Will be translated to s3 path
+
+    Returns
+        Str. HTML for abstract.
+    """
+
+    ds_parent = get_dataset_by_title(parent_layer_name)
+
+    summary = pd.DataFrame((gdf.species_norwegian + "(" + gdf.species_english + ")").value_counts(), columns=["count"])
+    summary.loc["Total Species Count"] = [summary["count"].sum()]  
+    summary.loc["Geopackage Path"] = os.path.join(*storage._jhub_path_to_minio(jhub_path))
+    summary.loc["Orthophoto Link"] = GEONODE_URL + f"datasets/{ds_parent['pk']}"
+
+    summary.to_html(header=None)
+    
+    abstract = f"Detection using {model} on {parent_layer_name}.<br><br>{summary.to_html(header=None)}<br><br>"
+    abstract += ds_parent["abstract"]
 
     return abstract
