@@ -288,11 +288,9 @@ def get_detection_abstract(gdf: gpd.GeoDataFrame, parent_layer_name: str,  model
     summary = pd.DataFrame((gdf.species_norwegian + "(" + gdf.species_english + ")").value_counts(), columns=["count"])
     summary.loc["Total Species Count"] = [summary["count"].sum()]  
     summary.loc["Geopackage Path"] = os.path.join(*storage._jhub_path_to_minio(jhub_path))
+    summary.loc["Orthophoto Name"] = parent_layer_name
     summary.loc["Orthophoto Link"] = GEONODE_URL + f"datasets/{ds_parent['pk']}"
-
-    summary.to_html(header=None)
     
-    abstract = f"Detection using {model} on {parent_layer_name}.<br><br>{summary.to_html(header=None)}<br><br>"
-    abstract += ds_parent["abstract"]
-
+    abstract = f"Detection using {model} on {parent_layer_name}.<br><br>{summary.to_html(header=None)}<br>"
+    abstract +=f"Parent dataset summary.<br><br>{ds_parent['abstract']}"
     return abstract
