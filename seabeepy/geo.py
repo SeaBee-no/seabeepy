@@ -195,7 +195,7 @@ def get_dataset_by_title(title):
     Returns
         Dict. Dataset information.
     """
-    filter_url = GEONODE_URL + f"resources?search={title}&search_fields=title"
+    filter_url = GEONODE_URL + "datasets?filter{title}=" + title
     response = requests.get(filter_url)
     response.raise_for_status()
     data = response.json()
