@@ -405,7 +405,7 @@ def is_detection_published(dir_path: str, task: str, model: str) -> bool:
     layer_name = get_layer_name(dir_path, model)
 
     gpkg_exists = os.path.isfile(
-        os.path.join(dir_path, "results", task, model, f"{layer_name}.tif")
+        os.path.join(dir_path, "results", task, model, f"{layer_name}.gpkg")
     )
 
     if gpkg_exists:
