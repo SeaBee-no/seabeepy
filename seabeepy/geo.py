@@ -135,7 +135,7 @@ def publish_transparent_style(layer_name: str, user, password, workspace="geonod
         username=user,
         password=password,
     )
-    geo.publish_style(layer_name=layer_name, style_name='transparent_polygon', workspace=workspace)
+    geo.publish_style(layer_name=layer_name, style_name="transparent_polygon", workspace=workspace)
 
 
 def upload_raster_to_geoserver(fpath, user, password, workspace="geonode"):
