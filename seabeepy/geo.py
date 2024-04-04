@@ -117,6 +117,27 @@ def upload_geopackage_to_geoserver(fpath: str, user: str, password: str, workspa
         raise GeoserverException(r.status_code, r.content)
 
 
+def publish_transparent_style(layer_name: str, user, password, workspace="geonode"):
+    """Publish a transparent style to GeoServer for a given layer.
+
+    Args
+        layer_name: Str. Name of layer to publish style for
+        user:       Str. GeoServer admin. user
+        password:   Str. GeoServer admin. password 
+        workspace:  Str. Default 'geonode'. GeoServer workspace
+
+    Returns
+        None. Style is published.
+    """
+    # Create client
+    geo = Geoserver(
+        GEOSERVER_URL,
+        username=user,
+        password=password,
+    )
+    geo.publish_style(layer_name=layer_name, style_name='transparent_polygon', workspace=workspace)
+
+
 def upload_raster_to_geoserver(fpath, user, password, workspace="geonode"):
     """Upload a raster from JupyterHub to GeoServer. The layer name in
     GeoServer will be the file name minus the extension.
@@ -291,6 +312,6 @@ def get_detection_abstract(gdf: gpd.GeoDataFrame, parent_layer_name: str,  model
     summary.loc["Orthophoto Name"] = parent_layer_name
     summary.loc["Orthophoto Link"] = GEONODE_URL + f"datasets/{ds_parent['pk']}"
     
-    abstract = f"Detection using {model} on {parent_layer_name}.<br><br>{summary.to_html(header=None)}<br>"
-    abstract +=f"Parent dataset summary.<br><br>{ds_parent['abstract']}"
+    abstract = f"Detection using {model} on {parent_layer_name}.<br><br>{summary.to_html(header=None)}"
+
     return abstract
