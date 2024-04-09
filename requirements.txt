@@ -7,7 +7,7 @@ matplotlib
 minio
 numpy
 owslib
-pandas
+pandas<=2.1
 pydantic[dotenv]
 pyodm
 requests
