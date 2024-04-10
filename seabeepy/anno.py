@@ -27,10 +27,14 @@ def df_to_nested_dict(df):
     return d
 
 
-def class_definition_from_df(
+def class_definition_from_df_deprecated(
     df, name, out_fold=None, version=1, org="NIVA", desc="", colour_dict=None
 ):
-    """Create a hierarchical class definition file for ArcGIS Pro from
+    """NOTE: This function is deprecated, but it's kept here for backwards-compatibility with
+    early versions of the class hierarchy (< v1.0). For versions 1.0 and up, use the new
+    'class_definition_from_df' function instead.
+
+    Create a hierarchical class definition file for ArcGIS Pro from
     an Excel table. Assumes the table has three levels (columns A to C),
     each more detailed than the last. The fourth column (D) should
     contain class descriptions for the most detailed level (level 3). For
@@ -152,6 +156,124 @@ def class_definition_from_df(
                     "subclasses": [],
                 }
                 lev2_dict["subclasses"].append(lev3_dict)
+
+    if out_fold:
+        fpath = os.path.join(out_fold, f"{name}.ecs")
+    else:
+        fpath = f"{name}.ecs"
+    with open(fpath, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=4)
+
+
+def class_definition_from_df(df, name, out_fold=None, version=1, org="NIVA", desc=""):
+    """Create a hierarchical class definition file for ArcGIS Pro from an Excel table.
+    Assumes the table has three levels, each more detailed than the last. The expected
+    format in Excel is:
+
+    |     **A**     |     **B**     |     **C**     |                      **D**                     |     **E**    |     **F**    |     **G**    |
+    |:-------------:|:-------------:|:-------------:|:----------------------------------------------:|:------------:|:------------:|:------------:|
+    | **lev1_name** | **lev2_name** | **lev3_name** |                  **lev3_desc**                 | **lev1_hex** | **lev2_hex** | **lev3_hex** |
+    |     ALGAE     |      RED      |     VERLA     | Vertebrata lanosa (grisetangdokke/trøffeltang) |    #996633   |    #CF4D50   |    #47223E   |
+    |     ALGAE     |      TURF     |      TURF     |             Unspecified turf (lurv)            |    #996633   |    #779A7F   |    #779A7F   |
+    |     ANGIO     |     ANGIO     |     ZOSMA     |            Zostera marina (ålegras)            |    #A7FD67   |    #A7FD67   |    #A7FD67   |
+    |     MAERL     |     MAERL     |     MAERL     |            Maerl (løstliggende rugl)           |    #CAA2A9   |    #CAA2A9   |    #CAA2A9   |
+    |     URCHIN    |     URCHIN    |     ECHES     |       Echinus esculentus (rød kråkebolle)      |    #868509   |    #868509   |    #ED7D31   |
+    |     URCHIN    |     URCHIN    |     GRAAC     |   Gracilechinus acutus (langpiggsjøpiggsvin)   |    #868509   |    #868509   |    #C98C58   |
+    |    STARFISH   |    STARFISH   |     OPHNI     |     Ophiocomina nigra (svart slangestjerne)    |    #80258F   |    #80258F   |    #80258F   |
+    |    STARFISH   |    STARFISH   |     ASTRU     |       Asterias rubens (vanlig korstroll)       |    #80258F   |    #80258F   |    #BE4BD1   |
+
+    A two digit code between 10 and 99 will be assigned sequentially to each class in
+    each level. For example, level 1 classes are numbered 10, 11, 12...; level 2
+    classes within level 1 class 10 are numbered 1010, 1011, 1012...; level 3
+    classes within level 2 class 12 are numbered 101210, 101211, 101212...
+
+    Args
+        df:          Dataframe defining class hierarchy. See example above.
+        name:        Str. Name of class definition file to create.
+        out_fold:    Str or None. Default None. Folder in which to save output file.
+        version:     Int. Default 1. ArcGIS Pro schema version.
+        org:         Str. Default ''. Name of organisation responsible for class file.
+        desc:        Str. Default ''. High level description for class file.
+
+    Returns
+        None. A class definition file named '{name}.ecs' is saved to the folder
+        specified (or to the  working directory if 'out_fold' is None).
+    """
+    # Validate input
+    req_cols = (
+        "lev1_name",
+        "lev2_name",
+        "lev3_name",
+        "lev3_desc",
+        "lev1_hex",
+        "lev2_hex",
+        "lev3_hex",
+    )
+    if tuple(df.columns) != req_cols:
+        raise KeyError(f"'df' must have columns: {req_cols}.")
+    if pd.isna(df).sum().sum() > 0:
+        raise ValueError("'df' contains missing values.")
+
+    # Create id columns
+    df = df.sort_values(by=["lev1_name", "lev2_name", "lev3_name"])
+    df["lev1_id"] = df["lev1_name"].astype("category").cat.codes + 10
+    df["lev2_id"] = (
+        df.groupby("lev1_name")["lev2_name"].transform(
+            lambda x: x.astype("category").cat.codes
+        )
+        + 10
+    )
+    df["lev3_id"] = (
+        df.groupby(["lev1_name", "lev2_name"])["lev3_name"].transform(
+            lambda x: x.astype("category").cat.codes
+        )
+        + 10
+    )
+
+    # Format ids
+    df["lev1_id"] = df["lev1_id"].apply(lambda x: str(x).zfill(2))
+    df["lev2_id"] = df["lev1_id"] + df["lev2_id"].apply(lambda x: str(x).zfill(2))
+    df["lev3_id"] = df["lev2_id"] + df["lev3_id"].apply(lambda x: str(x).zfill(2))
+
+    # Top-level data structure for .ecs file
+    data = {
+        "version": version,
+        "name": name,
+        "organization": org,
+        "description": desc,
+        "classDefs": [],
+    }
+
+    for lev1, lev1_group in df.groupby("lev1_id"):
+        lev1_dict = {
+            "classVal": lev1,
+            "alias": str(lev1),
+            "name": lev1_group["lev1_name"].iloc[0],
+            "color": lev1_group["lev1_hex"].iloc[0],
+            "description": "",
+            "subclasses": [],
+        }
+        for lev2, lev2_group in lev1_group.groupby("lev2_id"):
+            lev2_dict = {
+                "classVal": lev2,
+                "alias": str(lev2),
+                "name": lev2_group["lev2_name"].iloc[0],
+                "color": lev2_group["lev2_hex"].iloc[0],
+                "description": "",
+                "subclasses": [],
+            }
+            for _, row in lev2_group.iterrows():
+                lev3_dict = {
+                    "classVal": row["lev3_id"],
+                    "alias": str(row["lev3_id"]),
+                    "name": row["lev3_name"],
+                    "color": row["lev3_hex"],
+                    "description": row["lev3_desc"],
+                    "subclasses": [],
+                }
+                lev2_dict["subclasses"].append(lev3_dict)
+            lev1_dict["subclasses"].append(lev2_dict)
+        data["classDefs"].append(lev1_dict)
 
     if out_fold:
         fpath = os.path.join(out_fold, f"{name}.ecs")
