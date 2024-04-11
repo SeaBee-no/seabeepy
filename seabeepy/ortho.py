@@ -275,11 +275,12 @@ def parse_config(dir_path):
     return data
 
 
-def get_layer_name(dir_path):
+def get_layer_name(dir_path, postfix=""):
     """Build layer name for GeoServer from basic mission info in 'config.seabee.yaml'.
 
     Args
         dir_path: Str. Path to flight directory
+        postfix:  Str. Default "". Optional postfix for example model name
 
     Returns
         Str 'group_area_date_[spec]_[elev]' where 'spec' and 'elev' are optional.
@@ -292,9 +293,11 @@ def get_layer_name(dir_path):
         layer_name += f"_{spec}"
     if elev:
         layer_name += f"_{elev}m"
+    if postfix:
+        layer_name += f"_{postfix}"
 
     layer_name = layer_name.replace(" ", "-")
-
+    
     return layer_name
 
 
@@ -363,6 +366,49 @@ def is_publish_ready(dir_path):
 
     # '^' is equivalent to XOR for Bools
     if (odm_orig_exists ^ pix4d_orig_exists) and not cog_exists:
+        return True
+    else:
+        return False
+
+
+def is_detection_ready(dir_path: str) -> bool:
+    """Check if an ortophoto is detection ready
+
+    Args
+        dir_path: Str. Path to mission folder.
+
+    Returns
+        Bool. True if ready to publish, otherwise False.
+    """
+    layer_name = get_layer_name(dir_path)
+
+    cog_exists = os.path.isfile(
+        os.path.join(dir_path, "orthophoto", f"{layer_name}.tif")
+    )
+
+    if cog_exists:
+        return True
+    else:
+        return False
+
+def is_detection_published(dir_path: str, task: str, model: str) -> bool:
+    """Check if a detection geopackage is ready
+
+    Args
+        dir_path: Str. Path to mission folder.
+        task: Str. Task name, for example 'detection'
+        model: Str. Model name, a subfolder in the task directory
+
+    Returns
+        Bool. True if ready to publish, otherwise False.
+    """
+    layer_name = get_layer_name(dir_path, model)
+
+    gpkg_exists = os.path.isfile(
+        os.path.join(dir_path, "results", task, model, f"{layer_name}.gpkg")
+    )
+
+    if gpkg_exists:
         return True
     else:
         return False

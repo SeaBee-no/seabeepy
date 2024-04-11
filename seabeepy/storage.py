@@ -148,7 +148,7 @@ def delete_folder(folder, client):
     return result
 
 
-def copy_folder(src_fold, dst_fold, client, overwrite=False, containing_folder=True):
+def copy_folder(src_fold, dst_fold, client, overwrite=False, clean_dst=False, containing_folder=True):
     """Copy everything in 'src_fold' to 'dst_fold', maintaining the subfolder structure
     within 'src_fold'. 'src_fold' can be anything the user had read access to;
     'dst_fold' must be a location on MinIO (both expressed as absolute paths on the Hub).
@@ -163,6 +163,7 @@ def copy_folder(src_fold, dst_fold, client, overwrite=False, containing_folder=T
         client:            Obj. Active s3fs Python client (from the 'minio_login' function)
         overwrite:         Bool. Default False. Whether to overwrite 'dst_path' if it
                            already exists
+        clean_dst:         Bool. Default False. Whether to first delete existing dst folder when overwrite is True
         containing_folder: Bool. Default True. If True, 'src_fold' itself will be copied
                            into 'dst_fold'; if False, the contents of 'src_fold' will be
                            copied
@@ -188,7 +189,7 @@ def copy_folder(src_fold, dst_fold, client, overwrite=False, containing_folder=T
             f"Destination folder '{dst_fold}' already exists. Pass 'overwrite = True' to replace."
         )
 
-    if client.exists(dst_fold) and overwrite:
+    if client.exists(dst_fold) and overwrite and clean_dst:
         delete_folder(dst_fold, client)
 
     if src_bucket:
