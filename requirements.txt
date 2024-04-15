@@ -19,4 +19,4 @@ tqdm
 xsdata>=21.9
 pydantic-settings
 SQLAlchemy<2.0
-psycopg2
+psycopg2-binary
