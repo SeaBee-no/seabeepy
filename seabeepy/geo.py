@@ -138,17 +138,23 @@ def upload_geopackage_layers_to_geoserver(
     style_dict=None,
 ):
     """Upload a list of layers from a geopackage to GeoServer, including optional
-    styling. Provides a more control than 'upload_geopackage_to_geoserver', which
+    styling. Provides more control than 'upload_geopackage_to_geoserver', which
     only uploads the first layer.
 
     Args
         gpkg_path: Str. Path to geopackage.
         layers: List of str. List of layer names to publish.
         username: Str. Admin. username for GeoServer.
-        password: Str. Admin. passowrd for GeoServer.
+        password: Str. Admin. password for GeoServer.
         workspace: Str. Default 'geonode'. Workspace to upload to.
-        style_dict: Dict. Optional. Default None. Dict mapping layer names to .sld
-            files (either hosted locally or on GitHub).
+        style_dict: Dict. Optional. Default None. Dict mapping layer names to SLD
+            files for styling layers. Dict values can either be paths to local .sld
+            files or the names of standard SeaBee SLD files hosted on GitHub here:
+                https://github.com/SeaBee-no/annotation/tree/main/sld_files
+            Example dict values:
+                '/path/to/local/file.sld' (local file)
+                'annotation_classes_v{version}_level{level}.sld' (hosted on GitHub)
+            In both cases, the .sld extension should be included.
 
     Returns
         Str. The name of the data store created (the same as the geopackage name
@@ -160,9 +166,6 @@ def upload_geopackage_layers_to_geoserver(
         password=password,
     )
 
-    # 'upload_geopackage_to_geoserver' creates a data store and publishes the first
-    # layer. Controling this via the API is fiddly, so here we just delete the first
-    # layer published and then publish the ones specified by the user instead
     first_layer = fiona.listlayers(gpkg_path)[0]
     store_name = upload_geopackage_to_geoserver(
         gpkg_path,
@@ -174,21 +177,36 @@ def upload_geopackage_layers_to_geoserver(
     for layer in layers:
         geo.publish_featurestore(store_name, layer)
 
-    # Style layers
     if style_dict:
         for layer, sld_path in style_dict.items():
             sld_name = os.path.splitext(os.path.basename(sld_path))[0]
+            if os.path.isfile(sld_path):
+                with open(sld_path, "rb") as f:
+                    sld_data = f.read()
+            else:
+                sld_path = f"https://raw.githubusercontent.com/SeaBee-no/annotation/main/sld_files/{sld_path}"
+                try:
+                    response = requests.get(sld_path)
+                    response.raise_for_status()
+                    sld_data = response.content
+                except requests.exceptions.RequestException as e:
+                    print(
+                        f"ERROR: Unable to retrieve SLD file '{sld_name}' from GitHub. {e}"
+                    )
+                    continue
+
             try:
-                geo.upload_style(path=sld_path, workspace=workspace)
+                geo.upload_style(path=sld_data, name=sld_name, workspace=workspace)
             except GeoserverException as e:
                 if "already exists" in str(e):
                     print(
-                        f"WARNING: Style {sld_name} already exists. The old SLD will be used for layer {layer}.\n"
-                        "If you want to use a different style, either delete/update the existing version, or create\n"
-                        "the SLD file with a different name."
+                        f"WARNING: Style '{sld_name}' already exists. The old style will be used for layer '{layer}'.\n"
+                        "If you want to use a different style, either delete/update the existing version, or create an SLD file with a different name."
                     )
                 else:
-                    raise  # re-raise the exception if it's not the one we're expecting
+                    print(f"Error: Unable to upload style. {e}")
+                    continue
+
             geo.publish_style(
                 layer_name=layer, style_name=sld_name, workspace=workspace
             )
@@ -381,5 +399,5 @@ def get_detection_abstract(
 
     abstract = f"Detection using {model} on {parent_layer_name}.<br><br>{summary.to_html(header=None)}.<br>"
     abstract += f"Parent dataset summary .<br><br>{ds_parent['abstract']}"
-    
+
     return abstract
