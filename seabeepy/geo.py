@@ -3,14 +3,17 @@ import os
 import subprocess
 import time
 
-import pandas as pd
+import fiona
 import geopandas as gpd
+import pandas as pd
 import requests
 from geo.Geoserver import Geoserver, GeoserverException
 
 from . import ortho, storage
 
-GEOSERVER_URL = os.environ.get("GEOSERVER_URL", r"https://geonode.seabee.sigma2.no/geoserver")
+GEOSERVER_URL = os.environ.get(
+    "GEOSERVER_URL", r"https://geonode.seabee.sigma2.no/geoserver"
+)
 GEONODE_URL = os.environ.get("GEONODE_URL", r"https://geonode.seabee.sigma2.no/api/v2/")
 
 
@@ -80,9 +83,16 @@ def standardise_orthophoto(
     subprocess.check_call(cmd)
 
 
-def upload_geopackage_to_geoserver(fpath: str, user: str, password: str, workspace="geonode") -> str:
-    """Upload a geopackage from JupyterHub to GeoServer. The filename will be used
-    as datastore name while the layer in the file will be used as layer name
+def upload_geopackage_to_geoserver(
+    fpath: str, user: str, password: str, workspace="geonode"
+) -> str:
+    """Upload a geopackage from JupyterHub to GeoServer. The name of the geopackage
+    will be used as a datastore and the first layer in the geopackage published as
+    a layer.
+
+    Only the first layer in the geopackage will be published. If you need
+    more control over exactly which layers are published, use
+    'upload_geopackage_layers_to_geoserver' instead.
 
     NOTE: Creation of the layer will be overwritten if it exist
 
@@ -101,8 +111,10 @@ def upload_geopackage_to_geoserver(fpath: str, user: str, password: str, workspa
     }
 
     store_name = os.path.splitext(os.path.basename(fpath))[0]
-    
-    url = f"{GEOSERVER_URL}/rest/workspaces/{workspace}/datastores/{store_name}/file.gpkg"
+
+    url = (
+        f"{GEOSERVER_URL}/rest/workspaces/{workspace}/datastores/{store_name}/file.gpkg"
+    )
 
     with open(fpath, "rb") as f:
         r = requests.put(
@@ -115,6 +127,73 @@ def upload_geopackage_to_geoserver(fpath: str, user: str, password: str, workspa
         return store_name
     else:
         raise GeoserverException(r.status_code, r.content)
+
+
+def upload_geopackage_layers_to_geoserver(
+    gpkg_path,
+    layers,
+    username,
+    password,
+    workspace="geonode",
+    style_dict=None,
+):
+    """Upload a list of layers from a geopackage to GeoServer, including optional
+    styling. Provides a more control than 'upload_geopackage_to_geoserver', which
+    only uploads the first layer.
+
+    Args
+        gpkg_path: Str. Path to geopackage.
+        layers: List of str. List of layer names to publish.
+        username: Str. Admin. username for GeoServer.
+        password: Str. Admin. passowrd for GeoServer.
+        workspace: Str. Default 'geonode'. Workspace to upload to.
+        style_dict: Dict. Optional. Default None. Dict mapping layer names to .sld
+            files (either hosted locally or on GitHub).
+
+    Returns
+        Str. The name of the data store created (the same as the geopackage name
+        but without the .gpkg extension).
+    """
+    geo = Geoserver(
+        GEOSERVER_URL,
+        username=username,
+        password=password,
+    )
+
+    # 'upload_geopackage_to_geoserver' creates a data store and publishes the first
+    # layer. Controling this via the API is fiddly, so here we just delete the first
+    # layer published and then publish the ones specified by the user instead
+    first_layer = fiona.listlayers(gpkg_path)[0]
+    store_name = upload_geopackage_to_geoserver(
+        gpkg_path,
+        username,
+        password,
+        workspace=workspace,
+    )
+    geo.delete_layer(first_layer, workspace=workspace)
+    for layer in layers:
+        geo.publish_featurestore(store_name, layer)
+
+    # Style layers
+    if style_dict:
+        for layer, sld_path in style_dict.items():
+            sld_name = os.path.splitext(os.path.basename(sld_path))[0]
+            try:
+                geo.upload_style(path=sld_path, workspace=workspace)
+            except GeoserverException as e:
+                if "already exists" in str(e):
+                    print(
+                        f"WARNING: Style {sld_name} already exists. The old SLD will be used for layer {layer}.\n"
+                        "If you want to use a different style, either delete/update the existing version, or create\n"
+                        "the SLD file with a different name."
+                    )
+                else:
+                    raise  # re-raise the exception if it's not the one we're expecting
+            geo.publish_style(
+                layer_name=layer, style_name=sld_name, workspace=workspace
+            )
+
+    return store_name
 
 
 def upload_raster_to_geoserver(fpath, user, password, workspace="geonode"):
@@ -270,7 +349,9 @@ def get_html_abstract(dir_path):
     return abstract
 
 
-def get_detection_abstract(gdf: gpd.GeoDataFrame, parent_layer_name: str,  model: str, jhub_path: str):
+def get_detection_abstract(
+    gdf: gpd.GeoDataFrame, parent_layer_name: str, model: str, jhub_path: str
+):
     """Build an HTML abstract for GeoNode based on data in 'config.seabee.yaml' .
 
     Args
@@ -285,12 +366,20 @@ def get_detection_abstract(gdf: gpd.GeoDataFrame, parent_layer_name: str,  model
 
     ds_parent = get_dataset_by_title(parent_layer_name)
 
-    summary = pd.DataFrame((gdf.species_norwegian + "(" + gdf.species_english + ")").value_counts(), columns=["count"])
-    summary.loc["Total Species Count"] = [summary["count"].sum()]  
-    summary.loc["Geopackage Path"] = os.path.join(*storage._jhub_path_to_minio(jhub_path))
+    summary = pd.DataFrame(
+        (gdf.species_norwegian + "(" + gdf.species_english + ")").value_counts(),
+        columns=["count"],
+    )
+    summary.loc["Total Species Count"] = [summary["count"].sum()]
+    summary.loc["Geopackage Path"] = os.path.join(
+        *storage._jhub_path_to_minio(jhub_path)
+    )
     summary.loc["Orthophoto Name"] = parent_layer_name
-    summary.loc["Orthophoto Link"] = f"https://geonode.seabee.sigma2.no/catalogue/#/dataset/{ds_parent['pk']}"
-    
+    summary.loc["Orthophoto Link"] = (
+        f"https://geonode.seabee.sigma2.no/catalogue/#/dataset/{ds_parent['pk']}"
+    )
+
     abstract = f"Detection using {model} on {parent_layer_name}.<br><br>{summary.to_html(header=None)}.<br>"
-    abstract += f"Parent dataset summary .<br><br>{ds_parent['abstract']}" 
+    abstract += f"Parent dataset summary .<br><br>{ds_parent['abstract']}"
+    
     return abstract
