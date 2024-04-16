@@ -1,7 +1,7 @@
 contextily
 fiona
 geopandas
-geoserver-rest>=2.7.0
+geoserver-rest
 lxml>=4.9.2
 matplotlib
 minio
