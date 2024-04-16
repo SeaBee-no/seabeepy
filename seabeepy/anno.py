@@ -283,15 +283,14 @@ def class_definition_from_df(df, name, out_fold=None, version=1, org="NIVA", des
         json.dump(data, f, ensure_ascii=False, indent=4)
 
 
-def get_class_codes(url):
+def get_class_codes(class_version):
     """Build a dataframe of class labels from an ArcGIS Pro class definition file (.ecs). hosted
     on GitHub. Assumes a hierarchical class definition file originally created from Excel using
     'class_definition_from_df'. Returns a dataframe with the codes, names and colours for each
     level in the .ecs file.
 
     Args
-        url: Str. Raw URL of class definition file (.ecs) on GitHub created using
-            'class_definition_from_df'
+        class_version: Str. Version of class definition file (.ecs) hosted on GitHub.
 
     Returns
         Dataframe.
@@ -299,9 +298,7 @@ def get_class_codes(url):
     Raises
         ValueError if URL does not end in '.ecs'.
     """
-    if not url.endswith(".ecs"):
-        raise ValueError("'url' must be a '.ecs' file.")
-
+    url = f"https://raw.githubusercontent.com/SeaBee-no/annotation/main/class_definitions/seabee_class_definitions_v{class_version}.ecs"
     response = requests.get(url)
     if response.status_code != 200:
         raise Exception(f"Failed to read URL: {response.status_code}")
@@ -356,15 +353,16 @@ def split_every_n(class_str, n=2):
     return [class_str[0 : i + n] for i in range(0, len(class_str), n)]
 
 
-def rebuild_class_hierarchy(gdf, class_def_path):
+def rebuild_class_hierarchy(gdf, class_version):
     """ArcGIS Pro merges hierarchical annotation and only stores a single
     class label in a field named 'Classcode'. The function
     'class_definition_from_df' embeds a hierarchical code that can be used
     afterwards to rebuild the hierarchy afterwards.
+    
     Args
-        gdf:            Geodataframe. Merged annotation from ArcGIS Pro
-        class_def_path: Str. Path to class definition file (.ecs) created
-                        using 'class_definition_from_df'
+        gdf:           Geodataframe. Merged annotation from ArcGIS Pro.
+        class_version: Str. Version of class definition file (.ecs) hosted
+                       on GitHub.
     Returns
         Geodataframe. Copy of 'gdf' with new columns added and unnecessary
         ones removed.
@@ -380,7 +378,7 @@ def rebuild_class_hierarchy(gdf, class_def_path):
     )
 
     # Read class definitions
-    df = get_class_codes(class_def_path)
+    df = get_class_codes(class_version)
 
     # Join
     for level in range(1, 4):
