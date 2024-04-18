@@ -201,7 +201,7 @@ def upload_geopackage_layers_to_geoserver(
                 if "already exists" in str(e):
                     print(
                         f"WARNING: Style '{sld_name}' already exists. The old style will be used for layer '{layer}'.\n"
-                        "If you want to use a different style, either delete/update the existing version, or create an SLD file with a different name."
+                        "If you want to use a different style, either delete/update the existing version, or create an SLD file with a different name.\n"
                     )
                 else:
                     print(f"Error: Unable to upload style. {e}")
@@ -246,7 +246,14 @@ def upload_raster_to_geoserver(fpath, user, password, workspace="geonode"):
     )
 
 
-def publish_to_geonode(layer_name, user, password, workspace="geonode", wait=10):
+def publish_to_geonode(
+    layer_name,
+    user,
+    password,
+    workspace="geonode",
+    store_name=None,
+    wait=10,
+):
     """Publish a layer from GeoServer to GeoNode.
 
     Args
@@ -254,6 +261,13 @@ def publish_to_geonode(layer_name, user, password, workspace="geonode", wait=10)
         user:       Str. GeoNode admin. user
         password:   Str. GeoNode admin. password
         workspace:  Str. Default 'geonode'. GeoServer workspace
+        store_name: Str or None. Default None. Name of store on GeoServer. For
+                    rasters (e.g. .tifs), the store name is the same as the layer
+                    name. Either pass 'store_name=layer_name' explicitly, or just
+                    leave 'store_name=None' and the function will assume
+                    'store_name=layer_name' by default. For vector data (e.g. from
+                    a geopackage), the store is the name of the geopackage and the
+                    layer is the name of the layer within the geopackage.
         wait:       Int. Default 10. Time in seconds to wait between
                     progress updates.
 
@@ -264,7 +278,10 @@ def publish_to_geonode(layer_name, user, password, workspace="geonode", wait=10)
     status_url = GEONODE_URL + r"management/jobs/"
     header = {"Content-Type": "application/json"}
     command = "updatelayers"
-    kwargs = {"filter": layer_name, "store": layer_name, "workspace": workspace}
+    if store_name is None:
+        kwargs = {"filter": layer_name, "store": layer_name, "workspace": workspace}
+    else:
+        kwargs = {"filter": layer_name, "store": store_name, "workspace": workspace}
     auth = (user, password)
     response = requests.post(
         cmd_url,
