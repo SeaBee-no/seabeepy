@@ -1,4 +1,5 @@
 import json
+import mimetypes
 import os
 import subprocess
 import time
@@ -418,3 +419,44 @@ def get_detection_abstract(
     abstract += f"Parent dataset summary .<br><br>{ds_parent['abstract']}"
 
     return abstract
+
+
+def upload_document_to_geonode(file_path, doc_name, doc_title, username, password):
+    """
+    Uploads a document (PDF, image, text file, Word document, video file) to GeoNode.
+    
+    NOTE: This endpoint is not currently supported by our version of GeoNode. When we 
+    upgrade to 4.1 this code needs testing!
+
+    Args
+        file_path: Str. The path to the file to be uploaded.
+        doc_name: Str. The name of the document to create on GeoNode.
+        doc_title: Str. The title to use for the document on GeoNode.
+        username: Str. Admin. username for GeoNode.
+        password: Str. Admin. password for GeoNode.
+
+    Returns
+        None.
+
+    Raises
+        ValueError if 'file_path' does not exist.
+        ValueError if the MIME type cannot be determined.
+        RequestException if the request fails.
+    """
+    if not os.path.isfile(file_path):
+        raise ValueError(f"'{file_path}' does not exist.")
+
+    mime_type = mimetypes.guess_type(file_path)[0]
+    if mime_type is None:
+        raise ValueError(f"Could not determine MIME type for '{file_path}'.")
+
+    payload = {"title": doc_title}
+    files = [("doc_file", (doc_name, open(file_path, "rb"), mime_type))]
+    auth = (username, password)
+    url = os.path.join(GEONODE_URL, "documents")
+
+    try:
+        response = requests.request("POST", url, auth=auth, data=payload, files=files)
+        response.raise_for_status()
+    except requests.exceptions.RequestException as e:
+        print(f"An error occurred while uploading the file: {e}")
