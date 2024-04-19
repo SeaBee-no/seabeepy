@@ -379,7 +379,7 @@ def get_html_abstract(dir_path):
         ],
     ).to_html(header=None)
 
-    abstract = f"RGB mosaic collected by {config_data['organisation']} at {area} ({group}) on {date.strftime('%Y-%m-%d')}.<br><br>{html}"
+    abstract = f"Collected by {config_data['organisation']} at {area} ({group}) on {date.strftime('%Y-%m-%d')}.<br><br>{html}"
 
     return abstract
 
