@@ -7,6 +7,7 @@ import time
 import fiona
 import geopandas as gpd
 import pandas as pd
+import rasterio as rio
 import requests
 from geo.Geoserver import Geoserver, GeoserverException
 
@@ -16,51 +17,159 @@ GEOSERVER_URL = os.environ.get(
     "GEOSERVER_URL", r"https://geonode.seabee.sigma2.no/geoserver"
 )
 GEONODE_URL = os.environ.get("GEONODE_URL", r"https://geonode.seabee.sigma2.no/api/v2/")
+DEFAULT_BAND_ORDER = ["nir", "rededge", "red", "green", "blue"]
 
 
-def standardise_orthophoto(
-    in_tif, out_tif, red_band=1, green_band=2, blue_band=3, nodata=255
-):
-    """Create a 3-band, cloud-optimised GeoTIFF ready for upload to GeoServer.
-    This function is useful to ensure raster datasets uploaded to GeoServer are
-    consistent, regardless of who produced them with which software.
-
-    Builds an RGB composite from the specified bands from 'in_tif'. Bands are
-    converted to 8-bit (with value scaling), any alpha bands are removed and
-    existing overview layers are discarded and rebuilt. The file is saved using
-    LZW compression.
+def get_geotiff_info(tif_path):
+    """Read basic metadata from a GeoTiff.
 
     Args
-        in_tif:     Str. Path to original GeoTIFF
-        out_tif:    Str. Path to GeoTIFF to be created. Must be a folder where you
-                    have "write" access i.e. somewhere in your HOME directory
-        red_band:   Int. Default 1. Band number for red band in 'in_tif'
-        green_band: Int. Default 2. Band number for green band in 'in_tif'
-        blue_band:  Int. Default 3. Band number for blue band in 'in_tif'
-        nodata:     Int. Default 255. Value to use for NoData. Typically 255 for
-                    seabirds and 0 for habitat mapping.
+        tif_path: Str. Path to GeoTiff.
+
+    Returns
+        Dict of properties. E.g.:
+            {
+                "pixel_dtype": "uint8",
+                "num_bands": 4,
+                "band_descriptions": {"red": 1, "green": 2, "blue": 3},
+                "nodata_value": None,
+            }
+
+    Raises
+        ValueError if the GeoTiff has multiple NoData values.
+    """
+    with rio.open(tif_path) as src:
+        info_dict = {
+            "pixel_dtype": src.dtypes[0],
+            "num_bands": src.count,
+            "band_descriptions": {
+                desc.lower(): idx + 1
+                for idx, desc in enumerate(src.descriptions)
+                if desc
+            }
+            or None,
+        }
+        nodata_values = set(nodata for nodata in src.nodatavals)
+        if len(nodata_values) == 1:
+            info_dict["nodata_value"] = nodata_values.pop()
+        else:
+            raise ValueError(
+                f"'{tif_path}' has multiple NoData values: {nodata_values}."
+            )
+
+    return info_dict
+
+
+def rename_key(d, old_key, new_key):
+    """Rename a key in a dict inplace.
+
+    Args
+        d: Dict to be modified.
+        old_key: Hashable. Old key to be replaced.
+        new_key: Hashable. New key.
+
+    Returns
+        Dict. 'd' is modified inplace.
+    """
+    if old_key in d:
+        d[new_key] = d.pop(old_key)
+    return d
+
+
+def patch_geotiff_info(info_dict):
+    """If accurate metadata cannot be read directly from a GeoTIFF, this function
+    attempts to fill-in some sensible defaults.
+
+    Args
+        info_dict: Dict. As returned by 'get_geotiff_info'.
+
+    Returns
+        Dict. Missing data in 'info_dict' is patched/updated with default values.
+
+    Raises
+        ValueError if the band order cannot be inferred from the number of bands.
+    """
+    # Assume default bands if not explicitly provided
+    band_dict = info_dict.get("band_descriptions")
+    if band_dict is None:
+        if info_dict.get("num_bands") == 4:
+            # Assume RGBA
+            info_dict["band_descriptions"] = {"red": 1, "green": 2, "blue": 3}
+        elif info_dict["num_bands"] == 5:
+            # Assume MS dataset created manually in correct order i.e.
+            # NIR, RedEdge, Red, Green, Blue
+            info_dict["band_descriptions"] = {
+                "nir": 1,
+                "rededge": 2,
+                "red": 3,
+                "green": 4,
+                "blue": 5,
+            }
+        else:
+            raise ValueError(f"Could not determine correct band order for '{in_tif}'.")
+
+    # Standardise 're' to 'rededge'
+    rename_key(info_dict["band_descriptions"], "re", "rededge")
+
+    nodata = info_dict.get("nodata_value")
+    if nodata is None:
+        # Assume 0
+        info_dict["nodata_value"] = 0
+
+    return info_dict
+
+
+def restructure_orthophoto(
+    in_tif,
+    out_tif,
+    band_dict,
+    band_order=["nir", "rededge", "red", "green", "blue"],
+    nodata=0,
+):
+    """Create a standardised, cloud-optimised GeoTIFF from an orthophoto. Bands
+    are re-ordered to match 'band_order' and converted to 8-bit (with value
+    scaling). Any alpha bands are removed and pixel values equal to 'nodata' are
+    set as NoData. Existing overview layers are discarded and rebuilt. The file
+    is saved using LZW compression.
+
+    Args
+        in_tif:     Str. Path to original GeoTIFF.
+        out_tif:    Str. Path to GeoTIFF to be created. Must be in a folder where
+                    you have "write" access i.e. somewhere in your HOME directory.
+        band_dict:  Dict mapping lowercase band names ('nir', 'rededge' etc.) to band
+                    numbers in 'in_tif'.
+        band_order: List. Default ["nir", "rededge", "red", "green", "blue"]. List
+                    specifiying the band order (1 to n) to create in 'out_tif'. If
+                    a band name in 'band_order' is not found in 'band_dict', it
+                    will be skipped. E.g. if 'in_tif' is an RGBA raster, you can
+                    still use the default 'band_order' and 'nir' and 'rededge' will be
+                    ignored, creating an 'out_tif' with R, G, B as bands 1, 2, 3.
+        nodata:     Int between 0 and 255. Default 0. Value to consider as NoData.
+                    Note that this function does not change an existing NoData value
+                    to a new value, it simply sets the NoData value in 'out_tif' to
+                    the value specified.
 
     Returns
         None. Raster is saved to the specified path.
+
+    Raises
+        ValueError if 'nodata' is not an integer.
+        ValueError if 'nodata' is not between 0 and 255.
+        ValueError if 'band_order' contains elements not in 'red', 'green', 'blue',
+            'rededge', 'nir'.
     """
-    for band in (red_band, green_band, blue_band):
-        if not isinstance(band, int):
-            raise ValueError(
-                "'red_band', 'green_band' and 'blue_band' must all be integers."
-            )
+    if not isinstance(nodata, int):
+        raise ValueError("'nodata' must be an integer.")
+    if not (0 <= nodata <= 255):
+        raise ValueError("'nodata' must be between 0 and 255.")
+    if not set(band_order).issubset(set(["nir", "rededge", "red", "green", "blue"])):
+        raise ValueError(
+            f"Currently supported bands are 'nir', 'rededge', 'red', 'green' and 'blue'. Got {band_order}."
+        )
 
-    assert isinstance(nodata, int) and (
-        0 <= nodata <= 255
-    ), "'nodata' must be an integer between 0 and 255."
-
+    # Build command for GDAL
     cmd = [
         "gdal_translate",
-        "-b",
-        str(red_band),
-        "-b",
-        str(green_band),
-        "-b",
-        str(blue_band),
         "-of",
         "COG",
         "-ot",
@@ -81,7 +190,130 @@ def standardise_orthophoto(
         in_tif,
         out_tif,
     ]
+    for band in band_order[::-1]:
+        if band in band_dict:
+            cmd.insert(1, str(band_dict[band]))
+            cmd.insert(1, "-b")
+
     subprocess.check_call(cmd)
+
+
+def set_nodata_from_alpha(
+    in_tif, out_tif, nodata_value=0, reclass_value=1, alpha_band_nodata=0
+):
+    """Sets the NoData value in a raster based on the alpha band.
+
+    By default, ODM and Pix4D use an alpha mask to define NoData in output
+    orthomosaics. For the ML algorithms, NR would prefer an explicit NoData value
+    (see https://github.com/SeaBee-no/documentation/issues/30).
+
+    This function explicitly sets a user-specified NoData value where values in
+    the alpha mask are equal to 'alpha_band_nodata'. Before updating values based
+    on the mask, any valid values equal to the new NoData value are first
+    relcassified to 'reclass_value'.
+
+    For example, by default ODM produces 8-bit RGB images where valid band values
+    range from 0 to 255 and values of 0 in the alpha channel represent NoData.
+    Using the default arguments, this function will first change valid band values
+    of 0 to 1 (which should not affect the ML - see issue above), and then set
+    band values to zero where the alpha mask is zero.
+
+    NOTE: This function assumes that the alpha band is always the last band in the
+    mosaic.
+
+    Args
+        in_tif:            Str. Path to input GeoTIFF file.
+        out_tif:           Str. Path to GeoTIFF to be created. Must be in a folder
+                           where you have "write" access i.e. somewhere in your
+                           HOME directory.
+        nodata_value:      Int. Default 0. Value to set as 'nodata' in the raster.
+        reclass_value:     Int. Default 1. Value to assign to valid data that is
+                           equal to the new 'nodata_value'.
+        alpha_band_nodata: Int. Default 0. Value in the alpha band that indicates
+                           NoData.
+
+    Returns
+        None. Raster is saved to the specified path.
+
+    Raises
+        ValueError if 'nodata_value', 'reclass_value', or 'alpha_band_nodata' are
+            not integers.
+        ValueError if 'nodata_value', 'reclass_value', or 'alpha_band_nodata' are
+            not between 0 and 255.
+    """
+    variables = {
+        "nodata_value": nodata_value,
+        "reclass_value": reclass_value,
+        "alpha_band_nodata": alpha_band_nodata,
+    }
+    for var_name, val in variables.items():
+        if not isinstance(val, int):
+            raise ValueError(f"'{var_name}' must be an integer.")
+        if not (0 <= val <= 255):
+            raise ValueError(f"'{var_name}' must be between 0 and 255.")
+
+    with rio.open(in_tif) as src:
+        data = src.read()
+
+        # Set valid values that are equal to the new 'nodata_value' to the
+        # 'reclass_value'
+        data[:-1][data[:-1] == nodata_value] = reclass_value
+
+        # Set band values to 'nodata_value' where the alpha band is equal to
+        # 'alpha_band_nodata'
+        alpha_band_mask = data[-1] == alpha_band_nodata
+        for band in range(data.shape[0] - 1):
+            data[band][alpha_band_mask] = nodata_value
+
+        # Save
+        profile = src.profile
+        band_descriptions = src.descriptions
+
+        with rio.open(out_tif, "w", **profile) as dst:
+            dst.write(data)
+            dst.descriptions = band_descriptions
+
+
+def standardise_orthophoto(in_tif, out_tif):
+    """ """
+    # Read basic metadata
+    info_dict = get_geotiff_info(in_tif)
+
+    # Patch missing metadata with default values
+    info_dict = patch_geotiff_info(info_dict)
+
+    # Explicitly set NoData as zero based on alpha mask
+    temp_fold = os.path.split(out_tif)[0]
+    temp_tif = os.path.join(temp_fold, "temp.tif")
+    fname = os.path.basename(in_tif)
+    if fname.lower().startswith("pix4d"):
+        # Some Pix4D mosaics seem to have NoData cells equal to 0 that are not
+        # included in the alpha mask. This is either an error in Pix4D or a
+        # problem with some of the manual post-processing. Assume band values
+        # of zero are also NoData.
+        reclass_value = 0
+    else:
+        # Band values of zero in the ODM output seem genuine, so preserve them
+        # by reclassifying to 1.
+        reclass_value = 1
+    set_nodata_from_alpha(
+        in_tif,
+        temp_tif,
+        nodata_value=0,
+        reclass_value=reclass_value,
+        alpha_band_nodata=0,
+    )
+
+    # Restructure orthophoto
+    band_dict = info_dict["band_descriptions"]
+    restructure_orthophoto(
+        temp_tif,
+        out_tif,
+        band_dict,
+        band_order=DEFAULT_BAND_ORDER,
+        nodata=0,
+    )
+    os.remove(temp_tif)
 
 
 def upload_geopackage_to_geoserver(
@@ -424,8 +656,8 @@ def get_detection_abstract(
 def upload_document_to_geonode(file_path, doc_name, doc_title, username, password):
     """
     Uploads a document (PDF, image, text file, Word document, video file) to GeoNode.
-    
-    NOTE: This endpoint is not currently supported by our version of GeoNode. When we 
+
+    NOTE: This endpoint is not currently supported by our version of GeoNode. When we
     upgrade to 4.1 this code needs testing!
 
     Args
