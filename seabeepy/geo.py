@@ -272,11 +272,12 @@ def set_nodata_from_alpha(
 
         # Save
         profile = src.profile
-        band_descriptions = src.descriptions
+        profile.update(compress='LZW', BIGTIFF='YES')
 
         with rio.open(out_tif, "w", **profile) as dst:
             dst.write(data)
-            dst.descriptions = band_descriptions
+            dst.descriptions = src.descriptions
+            dst.colorinterp = src.colorinterp
 
 
 def standardise_orthophoto(in_tif, out_tif):
