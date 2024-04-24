@@ -298,13 +298,13 @@ def set_nodata_from_alpha(
 
 def standardise_orthophoto(in_tif, out_tif):
     """Create a SeaBee standard orthophoto.
-    
+
     Args
         in_tif:            Str. Path to input GeoTIFF file.
         out_tif:           Str. Path to GeoTIFF to be created. Must be in a folder
                            where you have "write" access i.e. somewhere in your
                            HOME directory.
-                           
+
     Returns
         None. 'out_tif' is created.
     """
@@ -479,7 +479,9 @@ def upload_geopackage_layers_to_geoserver(
     return store_name
 
 
-def upload_raster_to_geoserver(fpath, user, password, workspace="geonode"):
+def upload_raster_to_geoserver(
+    fpath, user, password, workspace="geonode", sld_name=None
+):
     """Upload a raster from JupyterHub to GeoServer. The layer name in
     GeoServer will be the file name minus the extension.
 
@@ -490,6 +492,13 @@ def upload_raster_to_geoserver(fpath, user, password, workspace="geonode"):
         user:      Str. GeoServer admin. user
         password:  Str. GeoServer admin. password
         workspace: Str. Default 'geonode'. GeoServer workspace
+        sld_name:  Str or None. Default None. The name of one of the raster styles
+                   defined here:
+                       https://github.com/SeaBee-no/annotation/tree/main/sld_files
+                   (e.g. 'rgb_default_rgb.sld'). The SLD files define which bands
+                   to display in which colours, and whether to apply normalisation
+                   etc. If None, the first three bands will be coloured R, G, B
+                   without normalisation.
 
     Returns
         None.
@@ -509,6 +518,32 @@ def upload_raster_to_geoserver(fpath, user, password, workspace="geonode"):
         path=fpath,
         workspace=workspace,
     )
+
+    # Apply style if desired
+    if sld_name:
+        sld_path = f"https://raw.githubusercontent.com/SeaBee-no/annotation/main/sld_files/{sld_name}"
+        try:
+            response = requests.get(sld_path)
+            response.raise_for_status()
+            sld_data = response.content
+        except requests.exceptions.RequestException as e:
+            print(f"ERROR: Unable to retrieve SLD file '{sld_name}' from GitHub. {e}")
+            continue
+        try:
+            geo.upload_style(path=sld_data, name=sld_name, workspace=workspace)
+        except GeoserverException as e:
+            if "already exists" in str(e):
+                print(
+                    f"WARNING: Style '{sld_name}' already exists. The old style will be used for layer '{layer}'.\n"
+                    "If you want to use a different style, either delete/update the existing version, or create an SLD file with a different name.\n"
+                )
+            else:
+                print(f"Error: Unable to upload style. {e}")
+                continue
+
+        geo.publish_style(
+            layer_name=layer_name, style_name=sld_name, workspace=workspace
+        )
 
 
 def publish_to_geonode(
