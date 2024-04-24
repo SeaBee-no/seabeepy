@@ -528,7 +528,7 @@ def upload_raster_to_geoserver(
             sld_data = response.content
         except requests.exceptions.RequestException as e:
             print(f"ERROR: Unable to retrieve SLD file '{sld_name}' from GitHub. {e}")
-            continue
+            return
         try:
             geo.upload_style(path=sld_data, name=sld_name, workspace=workspace)
         except GeoserverException as e:
@@ -539,7 +539,7 @@ def upload_raster_to_geoserver(
                 )
             else:
                 print(f"Error: Unable to upload style. {e}")
-                continue
+                return
 
         geo.publish_style(
             layer_name=layer_name, style_name=sld_name, workspace=workspace
