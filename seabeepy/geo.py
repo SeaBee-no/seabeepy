@@ -546,6 +546,40 @@ def upload_raster_to_geoserver(
         )
 
 
+def get_raster_sld(tif_path, enhance_contrast=None):
+    """Get the name of a default SeaBee raster style (.sld) based on the numer of
+    bands in the dataset and whether or not to apply contrast enhancement.
+
+    Default SeaBee styles (SLDs) for vector and raster data are hosted here:
+
+        https://github.com/SeaBee-no/annotation/tree/main/sld_files
+
+    Args
+        tif_path:         Str. Path to standardised GeoTIFF.
+        enhance_contrast: Str or None. Default None. Whether to apply contrast
+                          enhancement to the display bands. Valid choices are
+                          None, 'normalise' or 'histogram'.
+
+    Returns
+        Str. Name of SLD file to use (which can be passed to
+        'upload_raster_to_geoserver').
+
+    Raises
+        ValueError if 'enhance_contrast' not in (None, 'normalise', 'histogram').
+    """
+    if enhance_contrast not in (None, "normalise", "histogram"):
+        raise ValueError(
+            "'enhance_contrast' must be one of (None, 'normalise', 'histogram')."
+        )
+    nbands = get_geotiff_info(tif_path)["num_bands"]
+    if enhance_contrast:
+        sld_name = f"{nbands}band_{enhance_contrast}_rgb.sld"
+    else:
+        sld_name = f"{nbands}band_default_rgb.sld"
+
+    return sld_name
+
+
 def publish_to_geonode(
     layer_name,
     user,
