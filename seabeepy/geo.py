@@ -505,14 +505,18 @@ def upload_raster_to_geoserver(
         sld_name:  Str or None. Default None. The name of one of the raster styles
                    defined here:
                        https://github.com/SeaBee-no/annotation/tree/main/sld_files
-                   (e.g. 'rgb_default_rgb.sld'). The SLD files define which bands
-                   to display in which colours, and whether to apply normalisation
-                   etc. If None, the first three bands will be coloured R, G, B
-                   without normalisation.
+                   (e.g. 'rgb_default_rgb'). WITHOUT the '.sld' extension. The SLD
+                   files define which bands to display in which colours, and whether
+                   to apply normalisation etc. If None, the first three bands will
+                   be coloured R, G, B without normalisation.
 
     Returns
         None.
     """
+    if sld_name:
+        if sld_name.endswith(".sld"):
+            sld_name = os.path.splitext(sld_name)[0]
+
     # Authenticate
     geo = Geoserver(
         GEOSERVER_URL,
@@ -531,7 +535,7 @@ def upload_raster_to_geoserver(
 
     # Apply style if desired
     if sld_name:
-        sld_path = f"https://raw.githubusercontent.com/SeaBee-no/annotation/main/sld_files/{sld_name}"
+        sld_path = f"https://raw.githubusercontent.com/SeaBee-no/annotation/main/sld_files/{sld_name}.sld"
         try:
             response = requests.get(sld_path)
             response.raise_for_status()
@@ -571,8 +575,8 @@ def get_raster_sld(tif_path, enhance_contrast=None):
                           None, 'normalise' or 'histogram'.
 
     Returns
-        Str. Name of SLD file to use (which can be passed to
-        'upload_raster_to_geoserver').
+        Str. Name of SLD file to use WITHOUT the .sld extension (which can be
+        passed to 'upload_raster_to_geoserver').
 
     Raises
         ValueError if 'enhance_contrast' not in (None, 'normalise', 'histogram').
@@ -583,9 +587,9 @@ def get_raster_sld(tif_path, enhance_contrast=None):
         )
     nbands = get_geotiff_info(tif_path)["num_bands"]
     if enhance_contrast:
-        sld_name = f"{nbands}band_{enhance_contrast}_rgb.sld"
+        sld_name = f"{nbands}band_{enhance_contrast}_rgb"
     else:
-        sld_name = f"{nbands}band_default_rgb.sld"
+        sld_name = f"{nbands}band_default_rgb"
 
     return sld_name
 
