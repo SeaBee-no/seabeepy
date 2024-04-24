@@ -40,21 +40,31 @@ def get_geotiff_info(tif_path):
         ValueError if the GeoTiff has multiple NoData values.
     """
     with rio.open(tif_path) as src:
-        band_descriptions = (
-            {desc.lower(): idx + 1 for idx, desc in enumerate(src.descriptions) if desc}
-            or {
-                colorinterp.name.lower(): idx + 1
-                for idx, colorinterp in enumerate(src.colorinterp)
-                if colorinterp.name
-            }
-            or None
-        )
+        nbands = src.count
+        band_descriptions = {
+            desc.lower(): idx + 1 for idx, desc in enumerate(src.descriptions) if desc
+        }
+        colour_interps = {
+            colorinterp.name.lower(): idx + 1
+            for idx, colorinterp in enumerate(src.colorinterp)
+            if colorinterp.name
+        }
+
+        # Only use band info if each band is uniquely identified. Try 'descriptions'
+        # first, then fall back to 'colorinterp'
+        if len(band_descriptions) == nbands:
+            band_info = band_descriptions
+        elif len(colour_interps) == nbands:
+            band_info = colour_interps
+        else:
+            band_info = None
 
         info_dict = {
             "pixel_dtype": src.dtypes[0],
-            "num_bands": src.count,
-            "band_descriptions": band_descriptions,
+            "num_bands": nbands,
+            "band_descriptions": band_info,
         }
+
         nodata_values = set(nodata for nodata in src.nodatavals)
         if len(nodata_values) == 1:
             info_dict["nodata_value"] = nodata_values.pop()
