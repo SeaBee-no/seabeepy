@@ -226,7 +226,7 @@ def restructure_orthophoto(
     with rio.open(out_tif, "r+") as ds:
         for bidx in range(ds.count):
             ds.set_band_description(bidx + 1, descriptions[bidx])
-            ds.colorinterp[bidx] = colorinterps[bidx]
+        ds.colorinterp = tuple(colorinterps)
 
 
 def set_nodata_from_alpha(
