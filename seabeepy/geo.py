@@ -297,7 +297,17 @@ def set_nodata_from_alpha(
 
 
 def standardise_orthophoto(in_tif, out_tif):
-    """ """
+    """Create a SeaBee standard orthophoto.
+    
+    Args
+        in_tif:            Str. Path to input GeoTIFF file.
+        out_tif:           Str. Path to GeoTIFF to be created. Must be in a folder
+                           where you have "write" access i.e. somewhere in your
+                           HOME directory.
+                           
+    Returns
+        None. 'out_tif' is created.
+    """
     # Read basic metadata
     info_dict = get_geotiff_info(in_tif)
 
