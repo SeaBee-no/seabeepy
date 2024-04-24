@@ -10,6 +10,7 @@ import pandas as pd
 import rasterio as rio
 import requests
 from geo.Geoserver import Geoserver, GeoserverException
+from rasterio.enums import ColorInterp
 
 from . import ortho, storage
 
@@ -202,6 +203,21 @@ def restructure_orthophoto(
 
     subprocess.check_call(cmd)
 
+    # Explicitly set band info and colorinterp
+    color_interp_dict = {
+        "red": ColorInterp.red,
+        "green": ColorInterp.green,
+        "blue": ColorInterp.blue,
+    }
+    descriptions = [band for band in band_order if band in band_dict]
+    colorinterps = [
+        color_interp_dict.get(band, ColorInterp.grey) for band in descriptions
+    ]
+    with rio.open(out_tif, "r+") as ds:
+        for bidx in range(ds.count):
+            ds.set_band_description(bidx + 1, descriptions[bidx])
+            ds.colorinterp[bidx] = colorinterps[bidx]
+
 
 def set_nodata_from_alpha(
     in_tif, out_tif, nodata_value=0, reclass_value=1, alpha_band_nodata=0
@@ -272,7 +288,7 @@ def set_nodata_from_alpha(
 
         # Save
         profile = src.profile
-        profile.update(compress='LZW', BIGTIFF='YES')
+        profile.update(compress="LZW", BIGTIFF="YES")
 
         with rio.open(out_tif, "w", **profile) as dst:
             dst.write(data)
