@@ -123,7 +123,7 @@ def patch_geotiff_info(info_dict):
                 "blue": 5,
             }
         else:
-            raise ValueError(f"Could not determine correct band order for '{in_tif}'.")
+            raise ValueError("Could not determine correct band order.")
 
     # Standardise 're' to 'rededge'
     rename_key(info_dict["band_descriptions"], "re", "rededge")
