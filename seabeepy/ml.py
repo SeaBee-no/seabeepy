@@ -190,7 +190,7 @@ def run_classification(mission_name: str, config_fold: str):
 
 
 def is_classification_ready(dir_path: str) -> bool:
-    """Check if an ortophoto is ready for classification.
+    """Check if a standardised ortophoto exists for classification.
 
     Args
         dir_path: Str. Path to mission folder.
