@@ -25,8 +25,9 @@ CONFIG_SCHEMA = Schema(
         "mosaic": bool,
         "publish": bool,
         "theme": lambda s: s.lower() in ("seabirds", "mammals", "habitat"),
+        Optional("classify"): Or(bool, None),
         Optional("spectrum_type"): Or(
-            lambda s: s.lower() in ("rgb", "ms", "hsi"), None
+            lambda s: s.lower() in ("rgb", "msi", "hsi"), None
         ),
         Optional("elevation"): Or(And(int, lambda x: x >= 0), None),
         Optional("creator_name"): Or(str, None),
