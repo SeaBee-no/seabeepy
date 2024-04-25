@@ -1,6 +1,7 @@
 import json
 import mimetypes
 import os
+import shutil
 import subprocess
 import time
 
@@ -187,8 +188,28 @@ def restructure_orthophoto(
             f"Currently supported bands are 'nir', 'rededge', 'red', 'green' and 'blue'. Got {band_order}."
         )
 
-    # Create a temporary file in the same directory as out_tif
+    # Make a copy of the original file
     temp_tif = os.path.join(os.path.dirname(out_tif), "temp2.tif")
+    shutil.copyfile(in_tif, temp_tif)
+
+    # Update band metadata on the copy
+    color_interp_dict = {
+        "red": ColorInterp.red,
+        "green": ColorInterp.green,
+        "blue": ColorInterp.blue,
+        "nir": ColorInterp.undefined,
+        "rededge": ColorInterp.undefined,
+    }
+    desc_dict = {val: key for key, val in band_dict.items()}
+    with rio.open(temp_tif, "r+") as ds:
+        nbands = ds.count
+        for bidx in range(nbands):
+            ds.set_band_description(bidx + 1, desc_dict.get(bidx + 1, "none"))
+        colorinterps = [
+            color_interp_dict.get(desc_dict[idx + 1], ColorInterp.undefined)
+            for idx in range(nbands)
+        ]
+        ds.colorinterp = tuple(colorinterps)
 
     # Build command for GDAL
     cmd = [
@@ -210,8 +231,8 @@ def restructure_orthophoto(
         "-scale",
         "-a_nodata",
         str(nodata),
-        in_tif,
         temp_tif,
+        out_tif,
     ]
     for band in band_order[::-1]:
         if band in band_dict:
@@ -219,42 +240,6 @@ def restructure_orthophoto(
             cmd.insert(1, "-b")
 
     subprocess.check_call(cmd)
-
-    # Open the temporary file and create a new dataset with correct band metadata
-    with rio.open(temp_tif) as src:
-        with rio.open(
-            out_tif,
-            "w",
-            driver="GTiff",
-            height=src.height,
-            width=src.width,
-            count=src.count,
-            dtype=rio.uint8,
-            crs=src.crs,
-            transform=src.transform,
-            nodata=nodata,
-            BIGTIFF="YES",
-            COMPRESS="LZW",
-            TILED="YES",
-        ) as dst:
-            # Write the bands to the new dataset
-            for idx in range(1, src.count + 1):
-                band = src.read(idx)
-                dst.write(band, idx)
-
-            # Set the color interpretation
-            color_interp_dict = {
-                "red": ColorInterp.red,
-                "green": ColorInterp.green,
-                "blue": ColorInterp.blue,
-                "nir": ColorInterp.undefined,
-                "rededge": ColorInterp.undefined,
-            }
-            descriptions = [band for band in band_order if band in band_dict]
-            colorinterps = [color_interp_dict[band] for band in descriptions]
-            for bidx, desc in enumerate(descriptions):
-                dst.set_band_description(bidx + 1, desc)
-            dst.colorinterp = tuple(colorinterps)
 
     # Delete the temporary file
     os.remove(temp_tif)
