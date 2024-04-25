@@ -185,7 +185,7 @@ def restructure_orthophoto(
         )
 
     # Create a temporary file in the same directory as out_tif
-    temp_tif = os.path.join(os.path.dirname(out_tif), "temp.tif")
+    temp_tif = os.path.join(os.path.dirname(out_tif), "temp2.tif")
 
     # Build command for GDAL
     cmd = [
