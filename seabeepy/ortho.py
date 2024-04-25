@@ -24,6 +24,7 @@ CONFIG_SCHEMA = Schema(
         "organisation": str,
         "mosaic": bool,
         "publish": bool,
+        "classify": bool,
         "theme": lambda s: s.lower() in ("seabirds", "mammals", "habitat"),
         Optional("classify"): Or(bool, None),
         Optional("spectrum_type"): Or(
@@ -55,6 +56,10 @@ CONFIG_SCHEMA = Schema(
             Optional("radiometric-calibration"): Or(
                 lambda s: s in ("camera", "camera+sun"), None
             ),
+        },
+        Optional("ml_options"): {
+            Optional("task"): lambda s: s.lower() in ("detection", "segmentation"),
+            Optional("model"): str,
         },
     }
 )
@@ -298,7 +303,7 @@ def get_layer_name(dir_path, postfix=""):
         layer_name += f"_{postfix}"
 
     layer_name = layer_name.replace(" ", "-")
-    
+
     return layer_name
 
 
@@ -367,49 +372,6 @@ def is_publish_ready(dir_path):
 
     # '^' is equivalent to XOR for Bools
     if (odm_orig_exists ^ pix4d_orig_exists) and not cog_exists:
-        return True
-    else:
-        return False
-
-
-def is_detection_ready(dir_path: str) -> bool:
-    """Check if an ortophoto is detection ready
-
-    Args
-        dir_path: Str. Path to mission folder.
-
-    Returns
-        Bool. True if ready to publish, otherwise False.
-    """
-    layer_name = get_layer_name(dir_path)
-
-    cog_exists = os.path.isfile(
-        os.path.join(dir_path, "orthophoto", f"{layer_name}.tif")
-    )
-
-    if cog_exists:
-        return True
-    else:
-        return False
-
-def is_detection_published(dir_path: str, task: str, model: str) -> bool:
-    """Check if a detection geopackage is ready
-
-    Args
-        dir_path: Str. Path to mission folder.
-        task: Str. Task name, for example 'detection'
-        model: Str. Model name, a subfolder in the task directory
-
-    Returns
-        Bool. True if ready to publish, otherwise False.
-    """
-    layer_name = get_layer_name(dir_path, model)
-
-    gpkg_exists = os.path.isfile(
-        os.path.join(dir_path, "results", task, model, f"{layer_name}.gpkg")
-    )
-
-    if gpkg_exists:
         return True
     else:
         return False
