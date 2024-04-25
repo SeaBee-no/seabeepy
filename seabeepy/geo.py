@@ -225,7 +225,7 @@ def restructure_orthophoto(
             driver="GTiff",
             height=src.height,
             width=src.width,
-            count=len(bands),
+            count=src.count,
             dtype=np.uint8,
             crs=src.crs,
             transform=src.transform,
@@ -235,7 +235,8 @@ def restructure_orthophoto(
             TILED="YES",
         ) as dst:
             # Write the bands to the new dataset
-            for idx, band in enumerate(bands, start=1):
+            for idx in range(1, src.count + 1):
+                band = src.read(idx)
                 dst.write(band, idx)
 
             # Set the color interpretation
@@ -249,8 +250,8 @@ def restructure_orthophoto(
             descriptions = [band for band in band_order if band in band_dict]
             colorinterps = [color_interp_dict[band] for band in descriptions]
             for bidx, desc in enumerate(descriptions):
-                ds.set_band_description(bidx + 1, desc)
-            ds.colorinterp = tuple(colorinterps)
+                dst.set_band_description(bidx + 1, desc)
+            dst.colorinterp = tuple(colorinterps)
 
     # Delete the temporary file
     os.remove(temp_tif)
