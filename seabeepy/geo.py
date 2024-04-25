@@ -184,6 +184,9 @@ def restructure_orthophoto(
             f"Currently supported bands are 'nir', 'rededge', 'red', 'green' and 'blue'. Got {band_order}."
         )
 
+    # Create a temporary file in the same directory as out_tif
+    temp_tif = os.path.join(os.path.dirname(out_tif), "temp.tif")
+
     # Build command for GDAL
     cmd = [
         "gdal_translate",
@@ -205,7 +208,7 @@ def restructure_orthophoto(
         "-a_nodata",
         str(nodata),
         in_tif,
-        out_tif,
+        temp_tif,
     ]
     for band in band_order[::-1]:
         if band in band_dict:
@@ -214,20 +217,43 @@ def restructure_orthophoto(
 
     subprocess.check_call(cmd)
 
-    # Explicitly set band info and colorinterp
-    color_interp_dict = {
-        "red": ColorInterp.red,
-        "green": ColorInterp.green,
-        "blue": ColorInterp.blue,
-    }
-    descriptions = [band for band in band_order if band in band_dict]
-    colorinterps = [
-        color_interp_dict.get(band, ColorInterp.grey) for band in descriptions
-    ]
-    with rio.open(out_tif, "r+") as ds:
-        for bidx in range(ds.count):
-            ds.set_band_description(bidx + 1, descriptions[bidx])
-        ds.colorinterp = tuple(colorinterps)
+    # Open the temporary file and create a new dataset with correct band metadata
+    with rio.open(temp_tif) as src:
+        with rio.open(
+            out_tif,
+            "w",
+            driver="GTiff",
+            height=src.height,
+            width=src.width,
+            count=len(bands),
+            dtype=np.uint8,
+            crs=src.crs,
+            transform=src.transform,
+            nodata=nodata,
+            BIGTIFF="YES",
+            COMPRESS="LZW",
+            TILED="YES",
+        ) as dst:
+            # Write the bands to the new dataset
+            for idx, band in enumerate(bands, start=1):
+                dst.write(band, idx)
+
+            # Set the color interpretation
+            color_interp_dict = {
+                "red": ColorInterp.red,
+                "green": ColorInterp.green,
+                "blue": ColorInterp.blue,
+                "nir": ColorInterp.undefined,
+                "rededge": ColorInterp.undefined,
+            }
+            descriptions = [band for band in band_order if band in band_dict]
+            colorinterps = [color_interp_dict[band] for band in descriptions]
+            for bidx, desc in enumerate(descriptions):
+                ds.set_band_description(bidx + 1, desc)
+            ds.colorinterp = tuple(colorinterps)
+
+    # Delete the temporary file
+    os.remove(temp_tif)
 
 
 def set_nodata_from_alpha(
