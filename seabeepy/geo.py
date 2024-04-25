@@ -63,6 +63,7 @@ def get_geotiff_info(tif_path):
             "pixel_dtype": src.dtypes[0],
             "num_bands": nbands,
             "band_descriptions": band_info,
+            "crs": str(src.crs),
         }
 
         nodata_values = set(nodata for nodata in src.nodatavals)
