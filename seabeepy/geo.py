@@ -226,7 +226,7 @@ def restructure_orthophoto(
             height=src.height,
             width=src.width,
             count=src.count,
-            dtype=rasterio.uint8,
+            dtype=rio.uint8,
             crs=src.crs,
             transform=src.transform,
             nodata=nodata,
