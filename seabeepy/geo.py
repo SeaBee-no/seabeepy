@@ -109,7 +109,10 @@ def patch_geotiff_info(info_dict):
     # Assume default bands if not explicitly provided
     band_dict = info_dict.get("band_descriptions")
     if band_dict is None:
-        if info_dict.get("num_bands") == 4:
+        if info_dict.get("num_bands") == 3:
+            # Assume RGB
+            info_dict["band_descriptions"] = {"red": 1, "green": 2, "blue": 3}
+        elif info_dict.get("num_bands") == 4:
             # Assume RGBA
             info_dict["band_descriptions"] = {"red": 1, "green": 2, "blue": 3}
         elif info_dict["num_bands"] == 5:
