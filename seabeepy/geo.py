@@ -580,7 +580,7 @@ def upload_raster_to_geoserver(
             if "already exists" in str(e):
                 print(
                     f"WARNING: Style '{sld_name}' already exists. The old style will be used for layer '{layer_name}'.\n"
-                    "If you want to use a different style, either delete/update the existing version, or create an SLD file with a different name.\n"
+                    "If you want to use a different style, either delete/update the existing version, or create an SLD file with a different name."
                 )
             else:
                 print(f"Error: Unable to upload style. {e}")
