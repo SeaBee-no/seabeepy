@@ -230,15 +230,21 @@ def run_classification(mission_name: str, config_fold: str, task: str):
 
     try:
         run_classification_process(
-            "preproc", config_fold, mission_name, f"{config_fold}/image_detection.yaml"
+            task,
+            "preproc",
+            config_fold,
+            mission_name,
+            f"{config_fold}/image_detection.yaml",
         )
         run_classification_process(
+            task,
             "test",
             config_fold,
             mission_name,
             f"{config_fold}/{mission_name}_preproc.yaml",
         )
         run_classification_process(
+            task,
             "postproc",
             config_fold,
             mission_name,
