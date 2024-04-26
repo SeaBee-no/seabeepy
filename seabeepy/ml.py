@@ -1,7 +1,6 @@
 import os
 import subprocess
 from datetime import datetime
-from pathlib import Path
 
 import geopandas as gpd
 import pandas as pd
@@ -18,7 +17,8 @@ VALID_TASKS = ("detection", "segmentation")
 
 
 def get_ml_options(dir_path):
-    """Update default ML options with those specified by the user in 'config.seabee.yaml'.
+    """Update default ML options with those specified by the user in
+    'config.seabee.yaml'.
 
     Args
         dir_path: Str. Path to flight directory
@@ -26,17 +26,56 @@ def get_ml_options(dir_path):
     Returns
         Dict of options to pass to NR's machine learning algorithm.
     """
-    default_options = {
-        "task": "detection",
-        "model": "2022_nina_birds_20230817",
-    }
+    # Define default options
+    default_options = {"task": "detection", "model": None}
 
+    # Read user options
     config_data = ortho.parse_config(dir_path)
-    if "ml_options" in config_data:
-        for key, value in config_data["ml_options"].items():
-            default_options[key] = value
+    user_options = config_data.get("ml_options", {})
+
+    # Update default options with user options
+    default_options.update(user_options)
+
+    # If no model is specified, use the most recent model for the specified task
+    if default_options["model"] is None:
+        default_options["model"] = get_default_model(default_options["task"])
 
     return default_options
+
+
+def get_default_model(task):
+    """Get the most recent model for 'task' based on the date in the model name.
+
+    Args
+        task: Str. "detection" or "segmentation".
+
+    Returns
+        Str. The name of the most recent model.
+
+    Raises
+        ValueError if 'task' not in VALID_TASKS
+    """
+    if task not in VALID_TASKS:
+        raise ValueError(
+            f"'task' must be either 'detection' or 'segmentation', not '{task}'."
+        )
+
+    # Initialize the most recent date and model
+    most_recent_date = datetime.min
+    most_recent_model = ""
+
+    models_dir = os.path.join(ROOT_PATH, "models", task)
+    for filename in os.listdir(models_dir):
+        model = os.path.splitext(filename)[0]
+        date_str = model.split("_")[-1]
+        date = datetime.strptime(date_str, "%Y%m%d")
+
+        # If this date is more recent, update the most recent date and model
+        if date > most_recent_date:
+            most_recent_date = date
+            most_recent_model = model
+
+    return most_recent_model
 
 
 def write_config_production(
@@ -54,22 +93,25 @@ def write_config_production(
         orthophoto_file: Str. Path to orthophoto to be classified.
         tempdir:         Str. Folder for intermediate files. Must already exist and
                          be a location where the user has write access.
-        model:           Str. Name of model to use.
+        model:           Str. Name of model to use. See 'models' bucket on MinIO.
         task:            Str. 'detection' or 'segmentation'. The type of
                          classification to perform.
         annotations:     Dict. Options passed to the classification pipeline. Not
-                         sure what is accepted yet - ASK JARLE. Example:
+                         sure what is accepted yet - ASK JARLE/ARE. Example:
                              {"crs": "epsg:32632",
                               "column_main_class": "species",
                               "columns_subtasks": ["activity", "sex", "age"],
                              }
 
     NOTE: This function needs adapting (and possibly splitting) to handle all the
-    different input combinations. I'm not sure what these are yet. Ask Jarle to help
-    generalise this function based on his knowledge of the input options.
+    different input combinations. I'm not sure what these are yet. Ask Jarle and Are
+    to help generalise this function based on their knowledge of the input options.
 
     Returns
         None. Files are written to {tmpdir}/config/
+        
+    Raises
+        ValueError if 'task' not in VALID_TASKS.
     """
     if task not in VALID_TASKS:
         raise ValueError(
@@ -221,7 +263,7 @@ def is_classification_published(dir_path: str, task: str, model: str) -> bool:
     Returns
         Bool. True if ready to publish, otherwise False.
     """
-    layer_name = get_layer_name(dir_path, model)
+    layer_name = ortho.get_layer_name(dir_path, model)
     gpkg_exists = os.path.isfile(
         os.path.join(dir_path, "results", task, model, f"{layer_name}.gpkg")
     )
