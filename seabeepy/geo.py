@@ -20,6 +20,16 @@ GEOSERVER_URL = os.environ.get(
 )
 GEONODE_URL = os.environ.get("GEONODE_URL", r"https://geonode.seabee.sigma2.no/api/v2/")
 DEFAULT_BAND_ORDER = ["nir", "rededge", "red", "green", "blue"]
+COLOUR_INTERP_DICT = {
+    "red": ColorInterp.red,
+    "green": ColorInterp.green,
+    "blue": ColorInterp.blue,
+    "nir": ColorInterp.undefined,
+    "rededge": ColorInterp.undefined,
+    "lwir": ColorInterp.undefined,
+    "panchro": ColorInterp.gray,
+    "alpha": ColorInterp.alpha,
+}
 
 
 def get_geotiff_info(tif_path):
@@ -31,38 +41,41 @@ def get_geotiff_info(tif_path):
     Returns
         Dict of properties. E.g.:
             {
-                "pixel_dtype": "uint8",
-                "num_bands": 4,
+                "file_name": fname,
+                "mission_name": mission_name,
+                "mission_dir": mission_dir,
+                "num_bands": nbands,
+                "pixel_dtype": dtype,
                 "band_descriptions": {"red": 1, "green": 2, "blue": 3},
+                "crs": "epsg:25833",
                 "nodata_value": None,
             }
 
     Raises
         ValueError if the GeoTiff has multiple NoData values.
     """
+    # Get basic file path info
+    fname = os.path.basename(tif_path)
+    mission_dir = os.path.dirname(os.path.dirname(tif_path))
+    mission_name = os.path.basename(mission_dir)
+
+    # Read properties from file
     with rio.open(tif_path) as src:
         nbands = src.count
-        band_descriptions = {
-            desc.lower(): idx + 1 for idx, desc in enumerate(src.descriptions) if desc
-        }
-        colour_interps = {
-            colorinterp.name.lower(): idx + 1
-            for idx, colorinterp in enumerate(src.colorinterp)
-            if colorinterp.name
-        }
-
-        # Only use band info if each band is uniquely identified. Try 'descriptions'
-        # first, then fall back to 'colorinterp'
+        band_descriptions = _get_band_info(src)
         if len(band_descriptions) == nbands:
+            # We can uniquely identify each band
             band_info = band_descriptions
-        elif len(colour_interps) == nbands:
-            band_info = colour_interps
         else:
+            # Can't identify with confidence; set to None
             band_info = None
 
         info_dict = {
-            "pixel_dtype": src.dtypes[0],
+            "file_name": fname,
+            "mission_name": mission_name,
+            "mission_dir": mission_dir,
             "num_bands": nbands,
+            "pixel_dtype": src.dtypes[0],
             "band_descriptions": band_info,
             "crs": str(src.crs),
         }
@@ -78,7 +91,27 @@ def get_geotiff_info(tif_path):
     return info_dict
 
 
-def rename_key(d, old_key, new_key):
+def _get_band_info(src):
+    """Merge band information contained in 'band_descriptions' and 'colorinterp'
+    into a single dict.
+
+    Args
+        src: Obj. Open rasterio dataset.
+
+    Returns
+        Dict of band information 'description' => 'band_num'.
+    """
+    band_info = {
+        idx + 1: (desc.lower() if desc else None)
+        or (colour.name.lower() if colour.name else None)
+        for idx, (desc, colour) in enumerate(zip(src.descriptions, src.colorinterp))
+    }
+    merged = {info: band for band, info in band_info.items() if info is not None}
+
+    return merged
+
+
+def _rename_key(d, old_key, new_key):
     """Rename a key in a dict inplace.
 
     Args
@@ -94,29 +127,46 @@ def rename_key(d, old_key, new_key):
     return d
 
 
-def patch_geotiff_info(info_dict):
+def infer_geotiff_metadata(tif_path):
     """If accurate metadata cannot be read directly from a GeoTIFF, this function
-    attempts to fill-in some sensible defaults.
+    attempts to "guess" based on other dataset properties.
 
     Args
-        info_dict: Dict. As returned by 'get_geotiff_info'.
+        tif_path: Str. Path to GeoTiff.
 
     Returns
-        Dict. Missing data in 'info_dict' is patched/updated with default values.
+        Dict of GeoTiff properties.
 
     Raises
         ValueError if the band order cannot be inferred from the number of bands.
     """
-    # Assume default bands if not explicitly provided
+    # Read metadata from the file if possible
+    info_dict = get_geotiff_info(tif_path)
+
+    # Infer bands if not explicitly provided
     band_dict = info_dict.get("band_descriptions")
     if band_dict is None:
-        if info_dict.get("num_bands") == 3:
+        # Get other data to help with guessing
+        spec = (
+            ortho.parse_config(info_dict["mission_dir"])
+            .get("spectrum_type", "rgb")
+            .lower()
+        )  # Assume RGB if not specified
+        nbands = info_dict["num_bands"]
+
+        # Heuristics for guessing band order
+        if nbands == 3:
             # Assume RGB
             info_dict["band_descriptions"] = {"red": 1, "green": 2, "blue": 3}
-        elif info_dict.get("num_bands") == 4:
+        elif (nbands == 4) and (spec == "rgb"):
             # Assume RGBA
-            info_dict["band_descriptions"] = {"red": 1, "green": 2, "blue": 3}
-        elif info_dict["num_bands"] == 5:
+            info_dict["band_descriptions"] = {
+                "red": 1,
+                "green": 2,
+                "blue": 3,
+                "alpha": 4,
+            }
+        elif (nbands == 5) and (spec == "msi"):
             # Assume MS dataset created manually in correct order i.e.
             # NIR, RedEdge, Red, Green, Blue
             info_dict["band_descriptions"] = {
@@ -127,15 +177,10 @@ def patch_geotiff_info(info_dict):
                 "blue": 5,
             }
         else:
-            raise ValueError("Could not determine correct band order.")
+            raise ValueError(f"Could not determine band order for '{tif_path}'.")
 
     # Standardise 're' to 'rededge'
-    rename_key(info_dict["band_descriptions"], "re", "rededge")
-
-    nodata = info_dict.get("nodata_value")
-    if nodata is None:
-        # Assume 0
-        info_dict["nodata_value"] = 0
+    _rename_key(info_dict["band_descriptions"], "re", "rededge")
 
     return info_dict
 
@@ -185,28 +230,21 @@ def restructure_orthophoto(
         raise ValueError("'nodata' must be between 0 and 255.")
     if not set(band_order).issubset(set(["nir", "rededge", "red", "green", "blue"])):
         raise ValueError(
-            f"Currently supported bands are 'nir', 'rededge', 'red', 'green' and 'blue'. Got {band_order}."
+            f"Currently supported bands are ['nir', 'rededge', 'red', 'green', 'blue'], not {band_order}."
         )
 
-    # Make a copy of the original file
+    # Make a copy of the original file for editing
     temp_tif = os.path.join(os.path.dirname(out_tif), "temp2.tif")
     shutil.copyfile(in_tif, temp_tif)
 
-    # Update band metadata on the copy
-    color_interp_dict = {
-        "red": ColorInterp.red,
-        "green": ColorInterp.green,
-        "blue": ColorInterp.blue,
-        "nir": ColorInterp.undefined,
-        "rededge": ColorInterp.undefined,
-    }
+    # Explictly set inferred band metadata on the copy
     desc_dict = {val: key for key, val in band_dict.items()}
     with rio.open(temp_tif, "r+") as ds:
         nbands = ds.count
         for bidx in range(nbands):
             ds.set_band_description(bidx + 1, desc_dict.get(bidx + 1, "none"))
         colorinterps = [
-            color_interp_dict.get(desc_dict[idx + 1], ColorInterp.undefined)
+            COLOUR_INTERP_DICT.get(desc_dict.get(idx + 1), ColorInterp.undefined)
             for idx in range(nbands)
         ]
         ds.colorinterp = tuple(colorinterps)
@@ -245,8 +283,14 @@ def restructure_orthophoto(
     os.remove(temp_tif)
 
 
-def set_nodata_from_alpha(
-    in_tif, out_tif, nodata_value=0, reclass_value=1, alpha_band_nodata=0
+def adjust_nodata(
+    in_tif,
+    out_tif,
+    orig_nodata,
+    band_dict,
+    new_nodata=0,
+    reclass_value=1,
+    alpha_band_nodata=0,
 ):
     """Sets the NoData value in a raster based on the alpha band.
 
@@ -273,9 +317,12 @@ def set_nodata_from_alpha(
         out_tif:           Str. Path to GeoTIFF to be created. Must be in a folder
                            where you have "write" access i.e. somewhere in your
                            HOME directory.
-        nodata_value:      Int. Default 0. Value to set as 'nodata' in the raster.
+        orig_nodata:       Int, Float or None. NoData value defined for 'in_tif'.
+        band_dict:         Dict mapping lowercase band names ('nir', 'rededge' etc.)
+                           to band numbers in 'in_tif'.
+        new_nodata:        Int. Default 0. Value to set as 'nodata' in 'out_tif'.
         reclass_value:     Int. Default 1. Value to assign to valid data that is
-                           equal to the new 'nodata_value'.
+                           equal to 'new_nodata'.
         alpha_band_nodata: Int. Default 0. Value in the alpha band that indicates
                            NoData.
 
@@ -289,9 +336,8 @@ def set_nodata_from_alpha(
             not between 0 and 255.
     """
     variables = {
-        "nodata_value": nodata_value,
+        "new_nodata": new_nodata,
         "reclass_value": reclass_value,
-        "alpha_band_nodata": alpha_band_nodata,
     }
     for var_name, val in variables.items():
         if not isinstance(val, int):
@@ -302,15 +348,42 @@ def set_nodata_from_alpha(
     with rio.open(in_tif) as src:
         data = src.read()
 
-        # Set valid values that are equal to the new 'nodata_value' to the
-        # 'reclass_value'
-        data[:-1][data[:-1] == nodata_value] = reclass_value
+        if "alpha" in band_dict:
+            alpha_idx = band_dict["alpha"] - 1
+            if orig_nodata is None:
+                # Metadata are specificed correctly using alpha channel. Applies to
+                # all ODM missions (both RGB and MSI), and some Pix4D RGB missions.
+                # Use alpha == alpha_band_nodata to represent NoData
+                alpha_mask = data[alpha_idx] == alpha_band_nodata
+                for bidx in range(data.shape[0]):
+                    if bidx != alpha_idx:
+                        # Set valid values that are equal to 'new_nodata' to the
+                        # 'reclass_value'
+                        data[bidx][data[bidx] == new_nodata] = reclass_value
 
-        # Set band values to 'nodata_value' where the alpha band is equal to
-        # 'alpha_band_nodata'
-        alpha_band_mask = data[-1] == alpha_band_nodata
-        for band in range(data.shape[0] - 1):
-            data[band][alpha_band_mask] = nodata_value
+                        # Set band values to 'new_nodata' where the alpha band is
+                        # equal to 'alpha_band_nodata'
+                        data[bidx][alpha_mask] = new_nodata
+            else:
+                # Alpha and an explicit NoData value are specified. Assume alpha
+                # represents something else and use the explicit NoData value
+                for bidx in range(data.shape[0]):
+                    if (bidx != alpha_idx) and (new_nodata != orig_nodata):
+                        data[bidx][data[bidx] == new_nodata] = reclass_value
+                        data[bidx][data[bidx] == orig_nodata] = new_nodata
+
+        else:
+            # No alpha channel
+            if orig_nodata is None:
+                # NoData info missing completely. Applies to many Pix4D MSI missions
+                # where the alpha channel has been discarded, but no new NoData
+                # value assigned. Assume orig_nodata is zero.
+                orig_nodata = 0
+
+            # The NoData value is specified explicitly. Applies to some Pix4D missions.
+            if new_nodata != orig_nodata:
+                data[data == new_nodata] = reclass_value
+                data[data == orig_nodata] = new_nodata
 
         # Save
         profile = src.profile
@@ -334,36 +407,25 @@ def standardise_orthophoto(in_tif, out_tif):
     Returns
         None. 'out_tif' is created.
     """
-    # Read basic metadata
-    info_dict = get_geotiff_info(in_tif)
+    # Infer metadata from GeoTiff
+    info_dict = infer_geotiff_metadata(in_tif)
+    band_dict = info_dict["band_descriptions"]
+    orig_nodata = info_dict["nodata_value"]
 
-    # Patch missing metadata with default values
-    info_dict = patch_geotiff_info(info_dict)
-
-    # Explicitly set NoData as zero based on alpha mask
+    # Standardise NoData
     temp_fold = os.path.split(out_tif)[0]
     temp_tif = os.path.join(temp_fold, "temp.tif")
-    fname = os.path.basename(in_tif)
-    if fname.lower().startswith("pix4d"):
-        # Some Pix4D mosaics seem to have NoData cells equal to 0 that are not
-        # included in the alpha mask. This is either an error in Pix4D or a
-        # problem with some of the manual post-processing. Assume band values
-        # of zero are also NoData.
-        reclass_value = 0
-    else:
-        # Band values of zero in the ODM output seem genuine, so preserve them
-        # by reclassifying to 1.
-        reclass_value = 1
-    set_nodata_from_alpha(
+    adjust_nodata(
         in_tif,
         temp_tif,
-        nodata_value=0,
-        reclass_value=reclass_value,
+        orig_nodata,
+        band_dict,
+        new_nodata=0,
+        reclass_value=1,
         alpha_band_nodata=0,
     )
 
-    # Restructure orthophoto
-    band_dict = info_dict["band_descriptions"]
+    # Restructure
     restructure_orthophoto(
         temp_tif,
         out_tif,
