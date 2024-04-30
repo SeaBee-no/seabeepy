@@ -1,9 +1,7 @@
 contextily
 fiona
 geopandas
-# Switch back to installing standard geoserver-rest once this is fixed
-# https://github.com/gicait/geoserver-rest/issues/147
-git+https://github.com/JamesSample/geoserver-rest.git@fix-update-style
+git+https://github.com/gicait/geoserver-rest.git
 lxml>=4.9.2
 matplotlib
 minio
