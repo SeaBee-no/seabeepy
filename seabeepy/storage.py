@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 
 import s3fs
+from sqlalchemy import create_engine
 
 
 def minio_login(user, password):
@@ -148,7 +149,9 @@ def delete_folder(folder, client):
     return result
 
 
-def copy_folder(src_fold, dst_fold, client, overwrite=False, clean_dst=False, containing_folder=True):
+def copy_folder(
+    src_fold, dst_fold, client, overwrite=False, clean_dst=False, containing_folder=True
+):
     """Copy everything in 'src_fold' to 'dst_fold', maintaining the subfolder structure
     within 'src_fold'. 'src_fold' can be anything the user had read access to;
     'dst_fold' must be a location on MinIO (both expressed as absolute paths on the Hub).
@@ -272,3 +275,17 @@ def copy_nodeodm_results(
             copy_file(src_path, dst_path, client, overwrite=False)
 
     return client.isdir(f"{mission_root}/orthophoto")
+
+
+def connect_postgis(username, password):
+    """Connect to the SeaBee PostGIS database on Sigma2."""
+    conn_str = f"postgresql:///seabee?host=geonode-postgresql&port=5432&user={username}&password={password}"
+    try:
+        engine = create_engine(conn_str)
+        conn = engine.connect()
+
+        return engine
+
+    except Exception as e:
+        print("Connection failed.")
+        print(e)
