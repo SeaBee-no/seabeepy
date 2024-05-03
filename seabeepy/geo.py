@@ -554,7 +554,7 @@ def upload_geopackage_layers_to_geoserver(
                 if "already exists" in str(e):
                     print(
                         f"WARNING: Style '{sld_name}' already exists. The old style will be used for layer '{layer}'.\n"
-                        "If you want to use a different style, either delete/update the existing version, or create an SLD file with a different name.\n"
+                        "If you want to use a different style, either delete/update the existing version, or create an SLD file with a different name."
                     )
                 else:
                     print(f"Error: Unable to upload style. {e}")
@@ -816,31 +816,30 @@ def get_detection_abstract(
     """Build an HTML abstract for GeoNode based on data in 'config.seabee.yaml' .
 
     Args
-        dir_path: Str. Path to mission folder.
+        dir_path:          Str. Path to mission folder.
         parent_layer_name: Str. Name of parent layer in GeoNode.
-        model:    Str. Name of model used for detection.
-        jhub_path: Str. jhub path to geopackage file on minio. Will be translated to s3 path
+        model:             Str. Name of model used for detection.
+        jhub_path:         Str. jhub path to geopackage file on minio. Will be
+                           translated to s3 path
 
     Returns
         Str. HTML for abstract.
     """
-
-    ds_parent = get_dataset_by_title(parent_layer_name)
-
+    mission_name = parent_layer_name.strip("_detections")
+    ds_parent = get_dataset_by_title(mission_name)
     summary = pd.DataFrame(
-        (gdf.species_norwegian + "(" + gdf.species_english + ")").value_counts(),
+        (gdf.species_norwegian + " (" + gdf.species_english + ")").value_counts(),
         columns=["count"],
     )
     summary.loc["Total Species Count"] = [summary["count"].sum()]
     summary.loc["Geopackage Path"] = os.path.join(
         *storage._jhub_path_to_minio(jhub_path)
     )
-    summary.loc["Orthophoto Name"] = parent_layer_name
+    summary.loc["Orthophoto Name"] = f"{mission_name}.tif"
     summary.loc["Orthophoto Link"] = (
         f"https://geonode.seabee.sigma2.no/catalogue/#/dataset/{ds_parent['pk']}"
     )
-
-    abstract = f"Detection using {model} on {parent_layer_name}.<br><br>{summary.to_html(header=None)}.<br>"
+    abstract = f"Detections using model '{model}' on {mission_name}.<br><br>{summary.to_html(header=None)}.<br>"
     abstract += f"Parent dataset summary .<br><br>{ds_parent['abstract']}"
 
     return abstract
