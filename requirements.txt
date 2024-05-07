@@ -20,3 +20,6 @@ xsdata>=21.9
 pydantic-settings
 SQLAlchemy<2.0
 psycopg2-binary
+jupyter
+torch==2.0.1
+torchvision
