@@ -281,8 +281,28 @@ def parse_config(dir_path):
     return data
 
 
+def replace_norwegian_chars(input_string):
+    """Convert special Norwegian characters (Å, å, Ø, ø, Æ, æ) to ASCII
+    alternatives.
+
+    Args
+        input_string: Str. Text to translate.
+
+    Returns
+        Str. Instances of (Å, å, Ø, ø, Æ, æ) in 'input_string' are replaced with
+        ASCII alternatives.
+    """
+    trans_table = str.maketrans(
+        {"Å": "Aa", "å": "aa", "Ø": "Oe", "ø": "oe", "Æ": "Ae", "æ": "ae"}
+    )
+
+    return input_string.translate(trans_table)
+
+
 def get_layer_name(dir_path, postfix=""):
     """Build layer name for GeoServer from basic mission info in 'config.seabee.yaml'.
+    Any special Norwegian characters in the config. file will be converted to ASCII.
+    The returned layer_name is all lowercase.
 
     Args
         dir_path: Str. Path to flight directory
@@ -303,6 +323,7 @@ def get_layer_name(dir_path, postfix=""):
         layer_name += f"_{postfix}"
 
     layer_name = layer_name.replace(" ", "-")
+    layer_name = replace_norwegian_chars(layer_name).lower()
 
     return layer_name
 
