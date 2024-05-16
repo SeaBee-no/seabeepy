@@ -307,7 +307,6 @@ def replace_norwegian_chars(input_string):
 def get_layer_name(dir_path, postfix=""):
     """Build layer name for GeoServer from basic mission info in 'config.seabee.yaml'.
     Any special Norwegian characters in the config. file will be converted to ASCII.
-    The returned layer_name is all lowercase.
 
     Args
         dir_path: Str. Path to flight directory
@@ -328,7 +327,7 @@ def get_layer_name(dir_path, postfix=""):
         layer_name += f"_{postfix}"
 
     layer_name = layer_name.replace(" ", "-")
-    layer_name = replace_norwegian_chars(layer_name).lower()
+    layer_name = replace_norwegian_chars(layer_name)
 
     return layer_name
 
