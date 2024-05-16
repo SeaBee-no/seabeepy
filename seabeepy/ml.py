@@ -183,7 +183,8 @@ def write_config_production(
                 "annotations": {
                     "crs": geo.get_geotiff_info(orthophoto_file)["crs"],
                     "column_main_class": "species",
-                    "columns_subtasks": ["activity", "sex", "age"],
+                    # "columns_subtasks": ["activity", "sex", "age"], # 2023 model
+                    "columns_subtasks": [], # 2024 model
                 },
                 "test_filenames": [orthophoto_file],
             },
@@ -475,7 +476,8 @@ def convert_seabird_class_codes_to_names(gdf, username, password):
     """
     gdf = gdf.drop(["fileid", "TEMP_image_filename"], axis="columns")
     eng = storage.connect_postgis(username, password)
-    tables = ["species", "activity", "sex", "age"]
+    # tables = ["species", "activity", "sex", "age"] # 2023 model
+    tables = ["species"] # 2024 model
     for table in tables:
         gdf[table] = gdf[table].astype(int)
         sql = text(f"SELECT * FROM {table}")
@@ -491,13 +493,13 @@ def convert_seabird_class_codes_to_names(gdf, username, password):
         "species_norwegian",
         "species_english",
         "species_latin",
-        "activity_description",
-        "sex_description",
-        "age_description",
+        # "activity_description", # 2023 model
+        # "sex_description", # 2023 model
+        # "age_description", # 2023 model
         "score_species",
-        "score_activity",
-        "score_sex",
-        "score_age",
+        # "score_activity", # 2023 model
+        # "score_sex", # 2023 model
+        # "score_age", # 2023 model
         "visibleonimage",
         "manuallyverified",
         "modelversion",
