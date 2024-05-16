@@ -292,9 +292,14 @@ def replace_norwegian_chars(input_string):
         Str. Instances of (Å, å, Ø, ø, Æ, æ) in 'input_string' are replaced with
         ASCII alternatives.
     """
-    trans_table = str.maketrans(
-        {"Å": "Aa", "å": "aa", "Ø": "Oe", "ø": "oe", "Æ": "Ae", "æ": "ae"}
-    )
+    trans_table = str.maketrans({
+        'Å': 'Aa', 'å': 'aa',
+        'Ø': 'Oe', 'ø': 'oe',
+        'Æ': 'Ae', 'æ': 'ae',
+        'É': 'E',  'é': 'e',
+        'Ö': 'Oe', 'ö': 'oe',
+        'Ä': 'Ae', 'ä': 'ae'
+    })
 
     return input_string.translate(trans_table)
 
