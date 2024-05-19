@@ -348,7 +348,7 @@ def is_classification_published(dir_path: str) -> bool:
     model = ml_options["model"]
     layer_name = ortho.get_layer_name(dir_path)
     gpkg_exists = os.path.isfile(
-        os.path.join(dir_path, "results", task, model, f"{layer_name}.gpkg")
+        os.path.join(dir_path, "results", task, model, f"{layer_name}_detections.gpkg")
     )
     if gpkg_exists:
         return True
