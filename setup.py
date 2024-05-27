@@ -22,7 +22,7 @@ setuptools.setup(
     long_description_content_type="text/markdown",
     url="https://nivanorge.github.io/seabeepy/",
     packages=setuptools.find_packages(),
-    install_requires=install_requires,
+    install_requires=[i for i in install_requires if not i.startswith('git+')],
     python_requires=">=3.9",
     classifiers=[
         "Development Status :: 3 - Alpha",

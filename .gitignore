@@ -131,3 +131,5 @@ dmypy.json
 birds.gpkg
 notebooks/*.tif
 notebooks/*.gpkg
+notebooks/nrdata/**
+notebooks/config/** 

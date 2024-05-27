@@ -1,13 +1,13 @@
 contextily
 fiona
 geopandas
-geoserver-rest
+git+https://github.com/gicait/geoserver-rest.git
 lxml>=4.9.2
 matplotlib
 minio
 numpy
 owslib
-pandas
+pandas<=2.1
 pydantic[dotenv]
 pyodm
 requests
@@ -18,3 +18,8 @@ shapely
 tqdm
 xsdata>=21.9
 pydantic-settings
+SQLAlchemy<2.0
+psycopg2-binary
+jupyter
+torch==2.0.1
+torchvision

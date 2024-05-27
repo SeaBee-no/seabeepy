@@ -1,3 +1,4 @@
+from typing import Optional
 from pydantic_settings import BaseSettings
 
 
@@ -8,6 +9,8 @@ class Settings(BaseSettings):
     GEOSERVER_PASSWORD: str
     GEONODE_USER: str
     GEONODE_PASSWORD: str
+    DB_USER: Optional[str] = None
+    DB_PASSWORD: Optional[str] = None
 
     class Config:
         case_sensitive = False

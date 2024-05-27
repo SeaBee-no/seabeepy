@@ -24,9 +24,11 @@ CONFIG_SCHEMA = Schema(
         "organisation": str,
         "mosaic": bool,
         "publish": bool,
+        "classify": bool,
         "theme": lambda s: s.lower() in ("seabirds", "mammals", "habitat"),
+        Optional("classify"): Or(bool, None),
         Optional("spectrum_type"): Or(
-            lambda s: s.lower() in ("rgb", "ms", "hsi"), None
+            lambda s: s.lower() in ("rgb", "msi", "hsi"), None
         ),
         Optional("elevation"): Or(And(int, lambda x: x >= 0), None),
         Optional("creator_name"): Or(str, None),
@@ -54,6 +56,10 @@ CONFIG_SCHEMA = Schema(
             Optional("radiometric-calibration"): Or(
                 lambda s: s in ("camera", "camera+sun"), None
             ),
+        },
+        Optional("ml_options"): {
+            Optional("task"): lambda s: s.lower() in ("detection", "segmentation"),
+            Optional("model"): str,
         },
     }
 )
@@ -275,11 +281,36 @@ def parse_config(dir_path):
     return data
 
 
-def get_layer_name(dir_path):
+def replace_norwegian_chars(input_string):
+    """Convert special Norwegian characters (Å, å, Ø, ø, Æ, æ) to ASCII
+    alternatives.
+
+    Args
+        input_string: Str. Text to translate.
+
+    Returns
+        Str. Instances of (Å, å, Ø, ø, Æ, æ) in 'input_string' are replaced with
+        ASCII alternatives.
+    """
+    trans_table = str.maketrans({
+        'Å': 'Aa', 'å': 'aa',
+        'Ø': 'Oe', 'ø': 'oe',
+        'Æ': 'Ae', 'æ': 'ae',
+        'É': 'E',  'é': 'e',
+        'Ö': 'Oe', 'ö': 'oe',
+        'Ä': 'Ae', 'ä': 'ae'
+    })
+
+    return input_string.translate(trans_table)
+
+
+def get_layer_name(dir_path, postfix=""):
     """Build layer name for GeoServer from basic mission info in 'config.seabee.yaml'.
+    Any special Norwegian characters in the config. file will be converted to ASCII.
 
     Args
         dir_path: Str. Path to flight directory
+        postfix:  Str. Default "". Optional postfix for example model name
 
     Returns
         Str 'group_area_date_[spec]_[elev]' where 'spec' and 'elev' are optional.
@@ -292,8 +323,11 @@ def get_layer_name(dir_path):
         layer_name += f"_{spec}"
     if elev:
         layer_name += f"_{elev}m"
+    if postfix:
+        layer_name += f"_{postfix}"
 
     layer_name = layer_name.replace(" ", "-")
+    layer_name = replace_norwegian_chars(layer_name)
 
     return layer_name
 
