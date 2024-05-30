@@ -86,7 +86,7 @@ def main(anc_folder, cube_list_refl, cube_folder, radiance_multiplier):
                  "lon": lon,
                  "lat": lat,
                  "mask_nodata": mask_nodata}
-            
+            #print(radiance_data)
             orad = OceanRad.from_radiance(radiance_data)
             
             orad.write_reflectance()
