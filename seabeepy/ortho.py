@@ -49,6 +49,8 @@ CONFIG_SCHEMA = Schema(
             Optional("split"): int,
             Optional("split-overlap"): int,
             Optional("crop"): And(Or(int, float), lambda x: x >= 0),
+            Optional("matcher-neighbors"): And(int, lambda x: x >= 0),
+            Optional("min-num-features"): And(int, lambda x: x > 0),
             Optional("pc-quality"): lambda s: s
             in ("ultra", "high", "medium", "low", "lowest"),
             Optional("feature-quality"): lambda s: s
