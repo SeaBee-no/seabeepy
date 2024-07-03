@@ -254,7 +254,7 @@ def parse_mission_data(dir_path, parse_date=False):
     data = parse_config(dir_path)
     group = data["grouping"]
     area = data["area"]
-    date = data["datetime"]
+    date = str(data["datetime"]) # schema allows for int that can be converted by datetime
     spec = data.get("spectrum_type")
     elev = data.get("elevation")
 
