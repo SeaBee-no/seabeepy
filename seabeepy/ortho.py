@@ -33,6 +33,8 @@ CONFIG_SCHEMA = Schema(
         Optional("elevation"): Or(And(int, lambda x: x >= 0), None),
         Optional("creator_name"): Or(str, None),
         Optional("project"): Or(str, None),
+        Optional("vehicle"): Or(str, None),
+        Optional("sensor"): Or(str, None),
         Optional("odm_options"): {
             Optional("dsm"): bool,
             Optional("dtm"): bool,
