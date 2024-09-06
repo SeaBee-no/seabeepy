@@ -33,6 +33,8 @@ CONFIG_SCHEMA = Schema(
         Optional("elevation"): Or(And(int, lambda x: x >= 0), None),
         Optional("creator_name"): Or(str, None),
         Optional("project"): Or(str, None),
+        Optional("vehicle"): Or(str, None),
+        Optional("sensor"): Or(str, None),
         Optional("odm_options"): {
             Optional("dsm"): bool,
             Optional("dtm"): bool,
@@ -49,6 +51,8 @@ CONFIG_SCHEMA = Schema(
             Optional("split"): int,
             Optional("split-overlap"): int,
             Optional("crop"): And(Or(int, float), lambda x: x >= 0),
+            Optional("matcher-neighbors"): And(int, lambda x: x >= 0),
+            Optional("min-num-features"): And(int, lambda x: x > 0),
             Optional("pc-quality"): lambda s: s
             in ("ultra", "high", "medium", "low", "lowest"),
             Optional("feature-quality"): lambda s: s
@@ -252,7 +256,7 @@ def parse_mission_data(dir_path, parse_date=False):
     data = parse_config(dir_path)
     group = data["grouping"]
     area = data["area"]
-    date = data["datetime"]
+    date = str(data["datetime"]) # schema allows for int that can be converted by datetime
     spec = data.get("spectrum_type")
     elev = data.get("elevation")
 
