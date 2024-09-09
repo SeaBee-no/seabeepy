@@ -7,8 +7,11 @@ from collections import namedtuple
 import pathlib
 import yaml
 
-
+import importlib
+from rad4sea import atmos
+importlib.reload(atmos)
 from rad4sea.atmos import OceanRad
+
 import pymap3d as pm
 import numpy as np
 import spectral as sp

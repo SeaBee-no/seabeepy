@@ -9,11 +9,18 @@ import yaml
 
 
 # Local resources
+import importlib
+
+
 from gref4hsi.scripts import georeference, orthorectification, coregistration
 from gref4hsi.utils import parsing_utils, specim_parsing_utils
 from gref4hsi.utils import visualize
 from gref4hsi.utils.config_utils import prepend_data_dir_to_relative_paths, customize_config
 
+#importlib.reload(gref4hsi)
+importlib.reload(georeference)
+importlib.reload(orthorectification)
+importlib.reload(coregistration)
 
 import numpy as np
 
@@ -215,7 +222,7 @@ def main(config_yaml, specim_mission_folder, geoid_path, config_template_path, l
     
     # 
     if fast_mode:
-        custom_config['Orthorectification']['resample_rgb_only'] = True
+        custom_config['Orthorectification']['resample_rgb_only'] = False
         custom_config['Orthorectification']['resolutionhyperspectralmosaic'] = 1
 
 
@@ -229,7 +236,8 @@ def main(config_yaml, specim_mission_folder, geoid_path, config_template_path, l
     # This function parses raw specim data including (spectral, radiometric, geometric) calibrations and nav data
     # into an h5 file. The nav data is written to "raw/nav/" subfolders, whereas hyperspectral data and calibration data 
     # written to "processed/hyperspectral/" and "processed/calibration/" subfolders
-    specim_parsing_utils.main(config=config,
+    if len(os.listdir(config['Absolute Paths']['h5_folder'])) == 0:
+        specim_parsing_utils.main(config=config,
                               config_specim=config_specim_preprocess)
     
     # Time interpolates and reformats the pose (of the vehicle body) to "processed/nav/" folder.
@@ -268,16 +276,17 @@ def main(config_yaml, specim_mission_folder, geoid_path, config_template_path, l
         # Resample full datacube
         custom_config['Orthorectification']['resample_rgb_only'] = False
         customize_config(config_path=config_file_mission, dict_custom=custom_config)
-
+        
         # Re-georeference with coregistred parameters
         georeference.main(config_file_mission, use_coreg_param=True)
-        
+            
+
         # Coregister this stuff
         orthorectification.main(config_file_mission)
 
         # Second round of comparison
         coregistration.main(config_file_mission, mode='compare', is_calibrated = True)
-        
+
         # Check bulk
         coregistration.main(config_file_mission, mode='calibrate', is_calibrated = True, coreg_dict = coreg_dict)
     
