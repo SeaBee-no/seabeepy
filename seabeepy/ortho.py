@@ -318,7 +318,7 @@ def get_layer_name(dir_path, postfix=""):
 
     Returns
         Str 'group_area_date_[spec]_[elev]' where 'spec' and 'elev' are optional.
-        Any spaces in the name will be replaced by '-'.
+        Any spaces or '.' in the name will be replaced by '-'.
     """
     group, area, date, spec, elev = parse_mission_data(dir_path, parse_date=False)
     layer_name = "_".join((group, area, date))
@@ -331,6 +331,7 @@ def get_layer_name(dir_path, postfix=""):
         layer_name += f"_{postfix}"
 
     layer_name = layer_name.replace(" ", "-")
+    layer_name = layer_name.replace(".", "-")
     layer_name = replace_norwegian_chars(layer_name)
 
     return layer_name
