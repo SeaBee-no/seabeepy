@@ -25,7 +25,8 @@ CONFIG_SCHEMA = Schema(
         "mosaic": bool,
         "publish": bool,
         "classify": bool,
-        "theme": lambda s: s.lower() in ("seabirds", "mammals", "habitat"),
+        "theme": lambda s: s.lower()
+        in ("seabirds", "mammals", "habitat", "water quality"),
         Optional("classify"): Or(bool, None),
         Optional("spectrum_type"): Or(
             lambda s: s.lower() in ("rgb", "msi", "hsi"), None
@@ -35,6 +36,8 @@ CONFIG_SCHEMA = Schema(
         Optional("project"): Or(str, None),
         Optional("vehicle"): Or(str, None),
         Optional("sensor"): Or(str, None),
+        Optional("licence"): Or(str, None),
+        Optional("licence_link"): Or(str, None),
         Optional("odm_options"): {
             Optional("dsm"): bool,
             Optional("dtm"): bool,
@@ -256,7 +259,9 @@ def parse_mission_data(dir_path, parse_date=False):
     data = parse_config(dir_path)
     group = data["grouping"]
     area = data["area"]
-    date = str(data["datetime"]) # schema allows for int that can be converted by datetime
+    date = str(
+        data["datetime"]
+    )  # schema allows for int that can be converted by datetime
     spec = data.get("spectrum_type")
     elev = data.get("elevation")
 
@@ -296,14 +301,22 @@ def replace_norwegian_chars(input_string):
         Str. Instances of (Å, å, Ø, ø, Æ, æ) in 'input_string' are replaced with
         ASCII alternatives.
     """
-    trans_table = str.maketrans({
-        'Å': 'Aa', 'å': 'aa',
-        'Ø': 'Oe', 'ø': 'oe',
-        'Æ': 'Ae', 'æ': 'ae',
-        'É': 'E',  'é': 'e',
-        'Ö': 'Oe', 'ö': 'oe',
-        'Ä': 'Ae', 'ä': 'ae'
-    })
+    trans_table = str.maketrans(
+        {
+            "Å": "Aa",
+            "å": "aa",
+            "Ø": "Oe",
+            "ø": "oe",
+            "Æ": "Ae",
+            "æ": "ae",
+            "É": "E",
+            "é": "e",
+            "Ö": "Oe",
+            "ö": "oe",
+            "Ä": "Ae",
+            "ä": "ae",
+        }
+    )
 
     return input_string.translate(trans_table)
 

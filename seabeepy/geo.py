@@ -30,6 +30,8 @@ COLOUR_INTERP_DICT = {
     "panchro": ColorInterp.gray,
     "alpha": ColorInterp.alpha,
 }
+DEFAULT_LICENCE = "CC-BY-4"
+DEFAULT_LICENCE_LINK = "https://creativecommons.org/licenses/by/4.0/"
 
 
 def get_geotiff_info(tif_path):
@@ -776,6 +778,12 @@ def get_html_abstract(dir_path):
     group, area, date, spec, elev = ortho.parse_mission_data(dir_path, parse_date=True)
     config_data = ortho.parse_config(dir_path)
 
+    # Set default licence if not specified
+    if config_data.get("licence") is None:
+        config_data["licence"] = DEFAULT_LICENCE
+    if config_data.get("licence_link") is None:
+        config_data["licence_link"] = DEFAULT_LICENCE_LINK
+
     html = pd.DataFrame(
         [
             os.path.join(*storage._jhub_path_to_minio(dir_path)),
@@ -791,6 +799,8 @@ def get_html_abstract(dir_path):
             config_data.get("creator_name", "-"),
             config_data["theme"].capitalize(),
             config_data["nfiles"],
+            config_data["licence"],
+            config_data["licence_link"],
         ],
         index=[
             "MinIO path",
@@ -806,6 +816,8 @@ def get_html_abstract(dir_path):
             "Creator",
             "Theme",
             "N images",
+            "Licence",
+            "Licence link",
         ],
     ).to_html(header=None)
 
