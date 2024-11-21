@@ -27,7 +27,6 @@ CONFIG_SCHEMA = Schema(
         "classify": bool,
         "theme": lambda s: s.lower()
         in ("seabirds", "mammals", "habitat", "water quality"),
-        Optional("classify"): Or(bool, None),
         Optional("spectrum_type"): Or(
             lambda s: s.lower() in ("rgb", "msi", "hsi"), None
         ),
