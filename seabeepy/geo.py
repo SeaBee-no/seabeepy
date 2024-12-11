@@ -841,7 +841,7 @@ def get_detection_abstract(
     Returns
         Str. HTML for abstract.
     """
-    mission_name = parent_layer_name.strip("_detections")
+    mission_name = parent_layer_name.removesuffix('_detections')
     ds_parent = get_dataset_by_title(mission_name)
     summary = pd.DataFrame(
         (gdf.species_norwegian + " (" + gdf.species_english + ")").value_counts(),
