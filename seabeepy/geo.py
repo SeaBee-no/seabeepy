@@ -741,8 +741,12 @@ def get_dataset_by_title(title):
     response = requests.get(filter_url)
     response.raise_for_status()
     data = response.json()
-    assert data["total"] == 1, f"More than one dataset found with title '{title}'."
-    return data["datasets"][0]
+    if data["total"] == 0:
+        raise ValueError(f"Dataset with title '{title}' not found.")
+    elif data["total"] > 1:
+        raise ValueError(f"More than one dataset found with title '{title}'.")
+    else:
+        return data["datasets"][0]
 
 
 def update_geonode_metadata(layer_name, user, password, metadata):
