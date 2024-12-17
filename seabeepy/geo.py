@@ -4,6 +4,7 @@ import os
 import shutil
 import subprocess
 import time
+from itertools import product
 
 import fiona
 import geopandas as gpd
@@ -12,6 +13,8 @@ import rasterio as rio
 import requests
 from geo.Geoserver import Geoserver, GeoserverException
 from rasterio.enums import ColorInterp
+from rasterio.features import rasterize
+from rasterio.windows import Window
 
 from . import ortho, storage
 
@@ -845,7 +848,7 @@ def get_detection_abstract(
     Returns
         Str. HTML for abstract.
     """
-    mission_name = parent_layer_name.removesuffix('_detections')
+    mission_name = parent_layer_name.removesuffix("_detections")
     ds_parent = get_dataset_by_title(mission_name)
     summary = pd.DataFrame(
         (gdf.species_norwegian + " (" + gdf.species_english + ")").value_counts(),
@@ -904,3 +907,73 @@ def upload_document_to_geonode(file_path, doc_name, doc_title, username, passwor
         response.raise_for_status()
     except requests.exceptions.RequestException as e:
         print(f"An error occurred while uploading the file: {e}")
+
+
+def geodataframe_to_raster(
+    gdf, value_col, template_raster_path, output_raster_path, window_size=50000
+):
+    """Convert a polygon geodataframe to a single band integer raster based on a
+    template raster and a column in the attribute table.
+
+    Args:
+        gdf (gpd.GeoDataFrame): Polygons to rasterize.
+        value_col (str): Name of column in 'gdf' containing integer values for each class.
+        template_raster_path (str): Path to GeoTIFF to use as the "template raster".
+        output_raster_path (str): Categorical GeoTIFF to create.
+        window_size (int): Size of the processing window.
+
+    Returns:
+        None. Integer raster saved to 'output_raster_path'.
+
+    Raises:
+        KeyError: If 'value_col' not in columns of 'gdf'.
+        ValueError: If 'window_size' is not an integer.
+
+        Prints a warning if the CRS of 'gdf' does not match that of 'template_raster_path'.
+        In this case, 'gdf' is reprojected before rasterizing.
+    """
+    if value_col not in gdf.columns:
+        raise KeyError(f"Column '{value_col}' not found in columns of 'gdf'.")
+    gdf[value_col] = gdf[value_col].astype(int)
+
+    if not isinstance(window_size, int):
+        raise ValueError("'window_size' must be an integer.")
+
+    with rasterio.open(template_raster_path) as src:
+        template_meta = src.meta.copy()
+        crs = src.crs
+
+    if gdf.crs != crs:
+        print(
+            "WARNING: CRS of 'gdf' does not match that of 'template_raster_path'. "
+            "'gdf' will be reprojected."
+        )
+        gdf = gdf.to_crs(crs)
+
+    # Process in chunks of size window_size x window_size
+    template_meta.update({"count": 1, "dtype": rasterio.int32, "compress": "lzw"})
+    with rasterio.open(output_raster_path, "w", **template_meta) as dst:
+        for i, j in product(
+            range(0, template_meta["height"], window_size),
+            range(0, template_meta["width"], window_size),
+        ):
+            # Adjust window size to avoid going out of bounds
+            win_height = min(window_size, template_meta["height"] - i)
+            win_width = min(window_size, template_meta["width"] - j)
+            window = Window(j, i, win_width, win_height)
+
+            # Rasterize the current window
+            out_shape = (window.height, window.width)
+            shapes = (
+                (geom, value) for geom, value in zip(gdf.geometry, gdf[value_col])
+            )
+            raster = rasterize(
+                shapes=shapes,
+                out_shape=out_shape,
+                transform=src.window_transform(window),
+                fill=0,
+                dtype=rasterio.int32,
+            )
+
+            # Write to output raster
+            dst.write(raster, 1, window=window)
