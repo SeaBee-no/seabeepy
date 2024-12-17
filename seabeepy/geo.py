@@ -939,7 +939,7 @@ def geodataframe_to_raster(
     if not isinstance(window_size, int):
         raise ValueError("'window_size' must be an integer.")
 
-    with rasterio.open(template_raster_path) as src:
+    with rio.open(template_raster_path) as src:
         template_meta = src.meta.copy()
         crs = src.crs
 
@@ -951,8 +951,8 @@ def geodataframe_to_raster(
         gdf = gdf.to_crs(crs)
 
     # Process in chunks of size window_size x window_size
-    template_meta.update({"count": 1, "dtype": rasterio.int32, "compress": "lzw"})
-    with rasterio.open(output_raster_path, "w", **template_meta) as dst:
+    template_meta.update({"count": 1, "dtype": rio.int32, "compress": "lzw"})
+    with rio.open(output_raster_path, "w", **template_meta) as dst:
         for i, j in product(
             range(0, template_meta["height"], window_size),
             range(0, template_meta["width"], window_size),
@@ -972,7 +972,7 @@ def geodataframe_to_raster(
                 out_shape=out_shape,
                 transform=src.window_transform(window),
                 fill=0,
-                dtype=rasterio.int32,
+                dtype=rio.int32,
             )
 
             # Write to output raster
