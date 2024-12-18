@@ -28,7 +28,7 @@ CONFIG_SCHEMA = Schema(
         "theme": lambda s: s.lower()
         in ("seabirds", "mammals", "habitat", "water quality"),
         Optional("spectrum_type"): Or(
-            lambda s: s.lower() in ("rgb", "msi", "hsi"), None
+            lambda s: s.lower() in ("rgb", "msi", "hsi", "thermal"), None
         ),
         Optional("elevation"): Or(And(int, lambda x: x >= 0), None),
         Optional("creator_name"): Or(str, None),
