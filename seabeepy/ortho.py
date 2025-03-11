@@ -1,4 +1,5 @@
 import datetime as dt
+import glob
 import os
 import time
 from pathlib import Path
@@ -384,15 +385,13 @@ def check_file_count(dir_path, verbose=False):
 
 def is_publish_ready(dir_path):
     """Check if an original orthophoto is ready to publish. The original orthophoto must be
-    in the 'orthophoto' subdirectory and named either 'odm_orthophoto.original.tif' (for
-    mosaics generated using NodeODM) or 'pix4d_orthophoto.original.tif' (for mosaics generated
-    using Pix4D).
+    in the 'orthophoto' subdirectory and named '*_orthophoto.original.tif'.
 
     If an original orthophoto exists, but a standardised version named f'{layer_name}.tif'
     does not, the folder is considered ready for further processing and publishing, if desired.
 
-    NOTE: If the folder contains originals from BOTH ODM and Pix4D, this function will return
-    False.
+    NOTE: If the folder contains multiple originals (e.g. from both ODM and Pix4D), this
+    function will return False.
 
     Args
         dir_path: Str. Path to mission folder.
@@ -400,20 +399,15 @@ def is_publish_ready(dir_path):
     Returns
         Bool. True if ready to publish, otherwise False.
     """
-    layer_name = get_layer_name(dir_path)
+    search_path = os.path.join(dir_path, "orthophoto", "*_orthophoto.original.tif")
+    flist = glob.glob(search_path)
 
-    odm_orig_exists = os.path.isfile(
-        os.path.join(dir_path, "orthophoto", "odm_orthophoto.original.tif")
-    )
-    pix4d_orig_exists = os.path.isfile(
-        os.path.join(dir_path, "orthophoto", "pix4d_orthophoto.original.tif")
-    )
-    cog_exists = os.path.isfile(
-        os.path.join(dir_path, "orthophoto", f"{layer_name}.tif")
-    )
-
-    # '^' is equivalent to XOR for Bools
-    if (odm_orig_exists ^ pix4d_orig_exists) and not cog_exists:
-        return True
-    else:
+    if len(flist) != 1:
+        # Either no original or multiple originals. Can't publish
         return False
+
+    # Have a single original. Check whether already processed
+    layer_name = get_layer_name(dir_path)
+    cog_path = os.path.join(dir_path, "orthophoto", f"{layer_name}.tif")
+
+    return not os.path.isfile(cog_path)
