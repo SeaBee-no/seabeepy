@@ -1,3 +1,4 @@
+aiobotocore<2.18
 contextily
 fiona
 geopandas
