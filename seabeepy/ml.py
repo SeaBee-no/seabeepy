@@ -151,26 +151,30 @@ def write_config_production(
             f"'task' must be either 'detection' or 'segmentation', not '{task}'."
         )
 
+    # Get model year
+    mod_yr = int(model.split("_")[-1][:4])
+
     # Create 'config' subfolder if it doesn't exist
     config_path = os.path.join(tmpdir, "config")
     os.makedirs(config_path, exist_ok=True)
 
+    # Write Hub config.
     hub_config_path = os.path.join(config_path, "hub.yaml")
+    hub_config_data = {
+        "DPATH_WORK": f"{tmpdir}/work",
+        "DPATH_MODELS": f"{ROOT_PATH}/models",
+        "DPATH_RESULTS": f"{tmpdir}/results",
+        "DPATH_PRETRAINED": f"{tmpdir}/pretrained",
+        "MINIO": {"USE": False},  # MinIO is already mounted, so we can read it directly
+        "TEST": {"DEVICE": DEVICE},
+    }
+    if mod_yr > 2024:
+        # Models from 2025 onwards use the Resnet-101 backbone, which requires additional settings
+        hub_config_data["TRAIN"]: {"ARCHITECTURE": "fasterrcnn_resnet101_fpn_multitask"}
     with open(hub_config_path, "w") as f:
-        yaml.dump(
-            {
-                "DPATH_WORK": f"{tmpdir}/work",
-                "DPATH_MODELS": f"{ROOT_PATH}/models",
-                "DPATH_RESULTS": f"{tmpdir}/results",
-                "DPATH_PRETRAINED": f"{tmpdir}/pretrained",
-                "MINIO": {
-                    "USE": False
-                },  # MinIO is already mounted, so we can read it directly
-                "TEST": {"DEVICE": DEVICE},
-            },
-            f,
-        )
+        yaml.dump(hub_config_data, f)
 
+    # Write class config.
     class_config_path = os.path.join(config_path, "image_classification.yaml")
     if task == "detection":
         options = {
@@ -183,13 +187,13 @@ def write_config_production(
                 "annotations": {
                     "crs": geo.get_geotiff_info(orthophoto_file)["crs"],
                     "column_main_class": "species",
-                    # "columns_subtasks": ["activity", "sex", "age"], # 2023 model
-                    "columns_subtasks": [], # 2024 model
+                    "columns_subtasks": [],
                 },
                 "test_filenames": [orthophoto_file],
             },
         }
     else:
+        # Segmentation
         options = {
             "mode": "production",
             "task": task,
@@ -476,8 +480,7 @@ def convert_seabird_class_codes_to_names(gdf, username, password):
     """
     gdf = gdf.drop(["fileid", "TEMP_image_filename"], axis="columns")
     eng = storage.connect_postgis(username, password)
-    # tables = ["species", "activity", "sex", "age"] # 2023 model
-    tables = ["species"] # 2024 model
+    tables = ["species"]
     for table in tables:
         gdf[table] = gdf[table].astype(int)
         sql = text(f"SELECT * FROM {table}")
@@ -493,13 +496,7 @@ def convert_seabird_class_codes_to_names(gdf, username, password):
         "species_norwegian",
         "species_english",
         "species_latin",
-        # "activity_description", # 2023 model
-        # "sex_description", # 2023 model
-        # "age_description", # 2023 model
         "score_species",
-        # "score_activity", # 2023 model
-        # "score_sex", # 2023 model
-        # "score_age", # 2023 model
         "visibleonimage",
         "manuallyverified",
         "modelversion",
@@ -507,6 +504,9 @@ def convert_seabird_class_codes_to_names(gdf, username, password):
         "comment",
         "geometry",
     ]
+    if "objectness_score" in gdf.columns:
+        # 'objectness_score' added to results from recent models. Include if available
+        col_order.insert(5, "objectness_score")
     gdf = gdf[col_order]
 
     return gdf
