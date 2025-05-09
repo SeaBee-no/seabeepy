@@ -170,7 +170,7 @@ def write_config_production(
     }
     if mod_yr > 2024:
         # Models from 2025 onwards use the Resnet-101 backbone, which requires additional settings
-        hub_config_data["TRAIN"]: {"ARCHITECTURE": "fasterrcnn_resnet101_fpn_multitask"}
+        hub_config_data["TRAIN"] = {"ARCHITECTURE": "fasterrcnn_resnet101_fpn_multitask"}
     with open(hub_config_path, "w") as f:
         yaml.dump(hub_config_data, f)
 
