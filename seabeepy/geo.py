@@ -862,7 +862,11 @@ def get_detection_abstract(
     summary.loc["Orthophoto Link"] = (
         f"https://geonode.seabee.sigma2.no/catalogue/#/dataset/{ds_parent['pk']}"
     )
-    abstract = f"Detections using model '{model}' on {mission_name}.<br><br>{summary.to_html(header=None)}.<br>"
+    abstract = (
+        f"Detections using model '{model}' on {mission_name}. "
+        "Only detections with species confidence ≥ 0.7 are shown."
+        f"<br><br>{summary.to_html(header=None)}.<br>"
+    )
     abstract += f"Parent dataset summary .<br><br>{ds_parent['abstract']}"
 
     return abstract
