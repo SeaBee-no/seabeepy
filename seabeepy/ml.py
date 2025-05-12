@@ -168,9 +168,11 @@ def write_config_production(
         "MINIO": {"USE": False},  # MinIO is already mounted, so we can read it directly
         "TEST": {"DEVICE": DEVICE},
     }
-    if mod_yr > 2024:
-        # Models from 2025 onwards use the Resnet-101 backbone, which requires additional settings
-        hub_config_data["TRAIN"] = {"ARCHITECTURE": "fasterrcnn_resnet101_fpn_multitask"}
+    if (mod_yr > 2024) and (task == "detection"):
+        # Seabird models from 2025 onwards use the Resnet-101 backbone, which requires additional settings
+        hub_config_data["TRAIN"] = {
+            "ARCHITECTURE": "fasterrcnn_resnet101_fpn_multitask"
+        }
     with open(hub_config_path, "w") as f:
         yaml.dump(hub_config_data, f)
 
@@ -201,6 +203,9 @@ def write_config_production(
                 "id": f"{task}/{model}",
             },
             "dataset": {
+                "class_attr": "lev3_name",
+                "code_attr": "lev3_code",
+                "area_attr": "subareas",
                 "root": ROOT_PATH,
                 "nodata": int(geo.get_geotiff_info(orthophoto_file)["nodata_value"]),
                 "images": {"image_1": {"image_path": orthophoto_file}},
