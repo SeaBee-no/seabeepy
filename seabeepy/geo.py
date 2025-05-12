@@ -834,16 +834,21 @@ def get_html_abstract(dir_path):
 
 
 def get_detection_abstract(
-    gdf: gpd.GeoDataFrame, parent_layer_name: str, model: str, jhub_path: str
+    gdf: gpd.GeoDataFrame,
+    parent_layer_name: str,
+    model: str,
+    jhub_path: str,
+    filter_thresh: float,
 ):
     """Build an HTML abstract for GeoNode based on data in 'config.seabee.yaml' .
 
     Args
-        dir_path:          Str. Path to mission folder.
+        gdf:               Obj. Geodataframe of detection results.
         parent_layer_name: Str. Name of parent layer in GeoNode.
         model:             Str. Name of model used for detection.
         jhub_path:         Str. jhub path to geopackage file on minio. Will be
-                           translated to s3 path
+                           translated to s3 path.
+        filter_thresh:     Float. Threshod used to filter 'gdf' based on 'score_species'.
 
     Returns
         Str. HTML for abstract.
@@ -864,7 +869,7 @@ def get_detection_abstract(
     )
     abstract = (
         f"Detections using model '{model}' on {mission_name}. "
-        "Only detections with species confidence ≥ 0.7 are shown."
+        f"Only detections with species confidence ≥ {filter_thresh} are shown."
         f"<br><br>{summary.to_html(header=None)}.<br>"
     )
     abstract += f"Parent dataset summary .<br><br>{ds_parent['abstract']}"
