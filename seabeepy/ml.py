@@ -255,11 +255,13 @@ def run_classification_process(
         )
     task = task[:3]
     if (task == "seg") and (process_name == "test"):
-        process_name = "production"
+        cmd_name = "production"
+    else:
+        cmd_name = process_name
     print(f"{process_name.capitalize()}...")
     pretty_run(
         [
-            f"nrseabee_{task}_{process_name}",
+            f"nrseabee_{task}_{cmd_name}",
             "-c",
             f"{config_fold}/hub.yaml",
             "-o",
