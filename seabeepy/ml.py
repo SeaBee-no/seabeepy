@@ -254,6 +254,8 @@ def run_classification_process(
             f"'process_name' must be one of ('preproc', 'test', 'postproc')."
         )
     task = task[:3]
+    if (task == "seg") and (process_name == "test"):
+        process_name = "production"
     print(f"{process_name.capitalize()}...")
     pretty_run(
         [
@@ -342,7 +344,9 @@ def is_classification_ready(dir_path: str) -> bool:
 
 
 def is_classification_published(dir_path: str) -> bool:
-    """Check if a classification geopackage is already published.
+    """Check if results are already published. For 'detection', checks for the
+    existence of a standardised geopackage. For 'segmentation' checks for the
+    existence of a 'level 1' predictions GeoTiff.
 
     Args
         dir_path: Str. Path to mission folder.
@@ -350,19 +354,25 @@ def is_classification_published(dir_path: str) -> bool:
         model: Str. Model name, a subfolder in the task directory
 
     Returns
-        Bool. True if ready to publish, otherwise False.
+        Bool. True if already published, otherwise False.
     """
     ml_options = get_ml_options(dir_path)
     task = ml_options["task"]
     model = ml_options["model"]
     layer_name = ortho.get_layer_name(dir_path)
-    gpkg_exists = os.path.isfile(
-        os.path.join(dir_path, "results", task, model, f"{layer_name}_detections.gpkg")
-    )
-    if gpkg_exists:
-        return True
+    if task == "detection":
+        published = os.path.isfile(
+            os.path.join(
+                dir_path, "results", task, model, f"{layer_name}_detections.gpkg"
+            )
+        )
     else:
-        return False
+        published = os.path.isfile(
+            os.path.join(
+                dir_path, "results", task, model, f"{layer_name}_lev1-predictions.tif"
+            )
+        )
+    return published
 
 
 def check_results_exist(dir_path: str) -> bool:
