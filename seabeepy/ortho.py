@@ -424,7 +424,7 @@ def is_ortho_published(mission_dir):
     Returns
         Bool. True if mission is published on GeoNode, else False.
     """
-    mission_name = sb.ortho.get_layer_name(mission_dir)
+    mission_name = get_layer_name(mission_dir)
     try:
         geo.get_dataset_by_title(mission_name)
         return True
