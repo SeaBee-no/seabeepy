@@ -8,6 +8,8 @@ import yaml
 from schema import And, Optional, Or, Schema, SchemaError
 from tqdm.notebook import tqdm
 
+from . import geo
+
 # Define valid schema for 'config.seabee.yaml'
 # Full list of ODM options here: https://docs.opendronemap.org/arguments/
 CONFIG_SCHEMA = Schema(
@@ -411,3 +413,21 @@ def is_publish_ready(dir_path):
     cog_path = os.path.join(dir_path, "orthophoto", f"{layer_name}.tif")
 
     return not os.path.isfile(cog_path)
+
+
+def is_ortho_published(mission_dir):
+    """Check whether an orthophoto is published on GeoNode.
+
+    Args
+        mission_dir: Str. Path to mission folder.
+
+    Returns
+        Bool. True if mission is published on GeoNode, else False.
+    """
+    mission_name = sb.ortho.get_layer_name(mission_dir)
+    try:
+        geo.get_dataset_by_title(mission_name)
+        return True
+    except ValueError as e:
+        print(e)
+        return False
