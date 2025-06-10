@@ -297,49 +297,6 @@ def adjust_nodata(
     reclass_value=1,
     alpha_band_nodata=0,
 ):
-    """Sets the NoData value in a raster based on the alpha band.
-
-    By default, ODM and Pix4D use an alpha mask to define NoData in output
-    orthomosaics. For the ML algorithms, NR would prefer an explicit NoData value
-    (see https://github.com/SeaBee-no/documentation/issues/30).
-
-    This function explicitly sets a user-specified NoData value where values in
-    the alpha mask are equal to 'alpha_band_nodata'. Before updating values based
-    on the mask, any valid values equal to the new NoData value are first
-    relcassified to 'reclass_value'.
-
-    For example, by default ODM produces 8-bit RGB images where valid band values
-    range from 0 to 255 and values of 0 in the alpha channel represent NoData.
-    Using the default arguments, this function will first change valid band values
-    of 0 to 1 (which should not affect the ML - see issue above), and then set
-    band values to zero where the alpha mask is zero.
-
-    NOTE: This function assumes that the alpha band is always the last band in the
-    mosaic.
-
-    Args
-        in_tif:            Str. Path to input GeoTIFF file.
-        out_tif:           Str. Path to GeoTIFF to be created. Must be in a folder
-                           where you have "write" access i.e. somewhere in your
-                           HOME directory.
-        orig_nodata:       Int, Float or None. NoData value defined for 'in_tif'.
-        band_dict:         Dict mapping lowercase band names ('nir', 'rededge' etc.)
-                           to band numbers in 'in_tif'.
-        new_nodata:        Int. Default 0. Value to set as 'nodata' in 'out_tif'.
-        reclass_value:     Int. Default 1. Value to assign to valid data that is
-                           equal to 'new_nodata'.
-        alpha_band_nodata: Int. Default 0. Value in the alpha band that indicates
-                           NoData.
-
-    Returns
-        None. Raster is saved to the specified path.
-
-    Raises
-        ValueError if 'nodata_value', 'reclass_value', or 'alpha_band_nodata' are
-            not integers.
-        ValueError if 'nodata_value', 'reclass_value', or 'alpha_band_nodata' are
-            not between 0 and 255.
-    """
     variables = {
         "new_nodata": new_nodata,
         "reclass_value": reclass_value,
@@ -351,51 +308,51 @@ def adjust_nodata(
             raise ValueError(f"'{var_name}' must be between 0 and 255.")
 
     with rio.open(in_tif) as src:
-        data = src.read()
-
-        if "alpha" in band_dict:
-            alpha_idx = band_dict["alpha"] - 1
-            if orig_nodata is None:
-                # Metadata are specificed correctly using alpha channel. Applies to
-                # all ODM missions (both RGB and MSI), and some Pix4D RGB missions.
-                # Use alpha == alpha_band_nodata to represent NoData
-                alpha_mask = data[alpha_idx] == alpha_band_nodata
-                for bidx in range(data.shape[0]):
-                    if bidx != alpha_idx:
-                        # Set valid values that are equal to 'new_nodata' to the
-                        # 'reclass_value'
-                        data[bidx][data[bidx] == new_nodata] = reclass_value
-
-                        # Set band values to 'new_nodata' where the alpha band is
-                        # equal to 'alpha_band_nodata'
-                        data[bidx][alpha_mask] = new_nodata
-            else:
-                # Alpha and an explicit NoData value are specified. Assume alpha
-                # represents something else and use the explicit NoData value
-                for bidx in range(data.shape[0]):
-                    if (bidx != alpha_idx) and (new_nodata != orig_nodata):
-                        data[bidx][data[bidx] == new_nodata] = reclass_value
-                        data[bidx][data[bidx] == orig_nodata] = new_nodata
-
-        else:
-            # No alpha channel
-            if orig_nodata is None:
-                # NoData info missing completely. Applies to many Pix4D MSI missions
-                # where the alpha channel has been discarded, but no new NoData
-                # value assigned. Assume orig_nodata is zero.
-                orig_nodata = 0
-
-            # The NoData value is specified explicitly. Applies to some Pix4D missions.
-            if new_nodata != orig_nodata:
-                data[data == new_nodata] = reclass_value
-                data[data == orig_nodata] = new_nodata
-
-        # Save
         profile = src.profile
         profile.update(compress="LZW", BIGTIFF="YES")
 
         with rio.open(out_tif, "w", **profile) as dst:
-            dst.write(data)
+            for ji, window in src.block_windows(1):
+                data = src.read(window=window)
+
+                if "alpha" in band_dict:
+                    alpha_idx = band_dict["alpha"] - 1
+                    if orig_nodata is None:
+                        # Metadata are specificed correctly using alpha channel. Applies to
+                        # all ODM missions (both RGB and MSI), and some Pix4D RGB missions.
+                        # Use alpha == alpha_band_nodata to represent NoData
+                        alpha_mask = data[alpha_idx] == alpha_band_nodata
+                        for bidx in range(data.shape[0]):
+                            if bidx != alpha_idx:
+                                # Set valid values that are equal to 'new_nodata' to the
+                                # 'reclass_value'
+                                data[bidx][data[bidx] == new_nodata] = reclass_value
+
+                                # Set band values to 'new_nodata' where the alpha band is
+                                # equal to 'alpha_band_nodata'
+                                data[bidx][alpha_mask] = new_nodata
+                    else:
+                        # Alpha and an explicit NoData value are specified. Assume alpha
+                        # represents something else and use the explicit NoData value
+                        for bidx in range(data.shape[0]):
+                            if (bidx != alpha_idx) and (new_nodata != orig_nodata):
+                                data[bidx][data[bidx] == new_nodata] = reclass_value
+                                data[bidx][data[bidx] == orig_nodata] = new_nodata
+                else:
+                    # No alpha channel
+                    if orig_nodata is None:
+                        # NoData info missing completely. Applies to many Pix4D MSI missions
+                        # where the alpha channel has been discarded, but no new NoData
+                        # value assigned. Assume orig_nodata is zero.
+                        orig_nodata = 0
+
+                    # The NoData value is specified explicitly. Applies to some Pix4D missions.
+                    if new_nodata != orig_nodata:
+                        data[data == new_nodata] = reclass_value
+                        data[data == orig_nodata] = new_nodata
+
+                dst.write(data, window=window)
+
             dst.descriptions = src.descriptions
             dst.colorinterp = src.colorinterp
 
