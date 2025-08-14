@@ -130,7 +130,7 @@ def write_config_production(
 
     Args
         orthophoto_file: Str. Path to orthophoto to be classified.
-        tempdir:         Str. Folder for intermediate files. Must already exist and
+        tmpdir:         Str. Folder for intermediate files. Must already exist and
                          be a location where the user has write access.
         model:           Str. Name of model to use. See 'models' bucket on MinIO.
         task:            Str. 'detection' or 'segmentation'. The type of
@@ -167,7 +167,7 @@ def write_config_production(
         "DPATH_PRETRAINED": f"{tmpdir}/pretrained",
         "MINIO": {"USE": False},  # MinIO is already mounted, so we can read it directly
         "TEST": {"DEVICE": DEVICE},
-    }
+    }       
     if (mod_yr > 2024) and (task == "detection"):
         # Seabird models from 2025 onwards use the Resnet-101 backbone, which requires additional settings
         hub_config_data["TRAIN"] = {
