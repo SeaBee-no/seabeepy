@@ -1,9 +1,9 @@
-aiobotocore<2.18
+aiobotocore
 contextily
 fiona
 geopandas
 git+https://github.com/gicait/geoserver-rest.git
-lxml>=4.9.2
+lxml
 matplotlib
 minio
 numpy
@@ -17,9 +17,9 @@ s3fs
 schema
 shapely
 tqdm
-xsdata>=21.9
+xsdata
 pydantic-settings
-SQLAlchemy>=2.0
+SQLAlchemy
 psycopg2-binary
 jupyter
 torch==2.0.1
