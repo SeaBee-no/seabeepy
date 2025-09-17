@@ -441,6 +441,61 @@ def standardise_orthophoto(in_tif, out_tif):
     os.remove(temp_tif)
 
 
+def check_datastore_exists(store_name, username, password):
+    """
+    Check whether a datastore with the given name exists on the Geoserver.
+
+    Args
+        store_name (str): The name of the datastore to check.
+        username (str): Geoserver username for authentication.
+        password (str): Geoserver password for authentication.
+
+    Returns
+        bool: True if the datastore exists, False if it does not.
+
+    Raises
+        GeoserverException: If an error other than a 404 (not found) occurs.
+    """
+    geo = Geoserver(
+        GEOSERVER_URL,
+        username=username,
+        password=password,
+    )
+    try:
+        geo.get_datastore(store_name=store_name)
+        return True
+    except GeoserverException as e:
+        if "404" in str(e):
+            return False
+        else:
+            raise
+
+
+def delete_featurestore(store_name, username, password, workspace="geonode"):
+    """
+    Delete a featurestore (datastore) from the specified workspace on the Geoserver.
+
+    Args
+        store_name (str): The name of the featurestore to delete.
+        username (str): Geoserver username for authentication.
+        password (str): Geoserver password for authentication.
+        workspace (str, optional): The workspace containing the featurestore.
+            Defaults to 'geonode'.
+
+    Returns
+        None
+
+    Raises
+        GeoserverException: If deletion fails due to server error or invalid parameters.
+    """
+    geo = Geoserver(
+        GEOSERVER_URL,
+        username=username,
+        password=password,
+    )
+    geo.delete_featurestore(featurestore_name=store_name, workspace=workspace)
+
+
 def upload_geopackage_to_geoserver(
     fpath: str, user: str, password: str, workspace="geonode"
 ) -> str:
