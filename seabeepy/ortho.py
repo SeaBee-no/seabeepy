@@ -44,24 +44,41 @@ CONFIG_SCHEMA = Schema(
             Optional("dsm"): bool,
             Optional("dtm"): bool,
             Optional("cog"): bool,
-            Optional("orthophoto-compression"): lambda s: s
-            in ("JPEG", "LZW", "PACKBITS", "DEFLATE", "LZMA", "NONE"),
-            Optional("orthophoto-resolution"): Or(int, float),
-            Optional("dem-resolution"): Or(int, float),
-            Optional("max-concurrency"): int,
+            Optional("time"): bool,
+            Optional("skip-report"): bool,
+            Optional("use-exif"): bool,
+            Optional("force-gps"): bool,
+            Optional("rolling-shutter"): bool,
+            Optional("use-fixed-camera-params"): bool,
+            Optional("bg-removal"): bool,
+            Optional("sky-removal"): bool,
             Optional("auto-boundary"): bool,
             Optional("use-3dmesh"): bool,
             Optional("fast-orthophoto"): bool,
             Optional("pc-rectify"): bool,
-            Optional("split"): int,
-            Optional("split-overlap"): int,
+            Optional("orthophoto-compression"): lambda s: s
+            in ("JPEG", "LZW", "PACKBITS", "DEFLATE", "LZMA", "NONE"),
+            Optional("orthophoto-resolution"): And(Or(int, float), lambda x: x >= 0),
+            Optional("dem-resolution"): And(Or(int, float), lambda x: x >= 0),
+            Optional("max-concurrency"): And(int, lambda x: x > 0),
+            Optional("split"): And(int, lambda x: x > 0),
+            Optional("split-overlap"): And(int, lambda x: x > 0),
             Optional("crop"): And(Or(int, float), lambda x: x >= 0),
+            Optional("pc-filter"): And(Or(int, float), lambda x: x >= 0),
             Optional("matcher-neighbors"): And(int, lambda x: x >= 0),
+            Optional("dem-gapfill-steps"): And(int, lambda x: x >= 0),
+            Optional("matcher-type"): lambda s: s in ("flann", "bow", "bruteforce"),
+            Optional("camera-lens"): lambda s: s in ("auto", "brown", "fisheye"),
+            Optional("feature-type"): lambda s: s
+            in ("dspsift", "akaze", "hahog", "orb", "sift"),
             Optional("min-num-features"): And(int, lambda x: x > 0),
+            Optional("gps-accuracy"): And(float, lambda x: x > 0),
             Optional("pc-quality"): lambda s: s
             in ("ultra", "high", "medium", "low", "lowest"),
             Optional("feature-quality"): lambda s: s
             in ("ultra", "high", "medium", "low", "lowest"),
+            Optional("sfm-algorithm"): lambda s: s
+            in ("incremental", "triangulation", "planar"),
             Optional("radiometric-calibration"): Or(
                 lambda s: s in ("camera", "camera+sun"), None
             ),
