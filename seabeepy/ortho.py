@@ -8,7 +8,9 @@ import yaml
 from schema import And, Optional, Or, Schema, SchemaError
 from tqdm.notebook import tqdm
 
-from . import geo
+from . import geo, storage
+
+TEMP_DIR = r"/home/notebook"
 
 # Define valid schema for 'config.seabee.yaml'
 # Full list of ODM options here: https://docs.opendronemap.org/arguments/
@@ -68,7 +70,8 @@ CONFIG_SCHEMA = Schema(
             Optional("matcher-neighbors"): And(int, lambda x: x >= 0),
             Optional("dem-gapfill-steps"): And(int, lambda x: x >= 0),
             Optional("matcher-type"): lambda s: s in ("flann", "bow", "bruteforce"),
-            Optional("camera-lens"): lambda s: s in ("auto", "brown", "fisheye"),
+            Optional("camera-lens"): lambda s: s
+            in ("auto", "brown", "fisheye, fisheye_opencv"),
             Optional("feature-type"): lambda s: s
             in ("dspsift", "akaze", "hahog", "orb", "sift"),
             Optional("min-num-features"): And(int, lambda x: x > 0),
@@ -448,3 +451,38 @@ def is_ortho_published(mission_dir):
     except ValueError as e:
         print(e)
         return False
+
+
+def update_config(mission_dir, config_data, client, overwrite=False):
+    """Update (or create) a config. file in 'mission_dir' using data from 'config_data'.
+
+    Args
+        mission_dir: Str. Path to mission folder.
+        config_data: Dict. Data to write.
+        client: Obj. MinIO client.
+        overwrite: Bool. Whether to overwrite an existing config. file, if one exists.
+
+    Returns
+        Str. Path where config. file has been saved.
+    """
+    config_path = os.path.join(mission_dir, "config.seabee.yaml")
+    temp_path = os.path.join(TEMP_DIR, "config.seabee.yaml")
+    write_config(temp_path, config_data)
+    storage.copy_file(temp_path, config_path, client, overwrite=overwrite)
+    os.remove(temp_path)
+
+    return config_path
+
+
+def write_config(config_path, data):
+    """Write a dict to YAML.
+
+    Args
+        config_path: Str. Path to YAML file to create.
+        data: Dict. Data to convert to YAML.
+
+    Returns
+        None. Data are saved to disk.
+    """
+    with open(config_path, "w") as yaml_file:
+        yaml.dump(data, yaml_file, default_flow_style=False, allow_unicode=True)
