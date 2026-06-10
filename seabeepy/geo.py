@@ -27,9 +27,9 @@ COLOUR_INTERP_DICT = {
     "red": ColorInterp.red,
     "green": ColorInterp.green,
     "blue": ColorInterp.blue,
-    "nir": ColorInterp.undefined,
-    "rededge": ColorInterp.undefined,
-    "lwir": ColorInterp.undefined,
+    "nir": ColorInterp.gray,
+    "rededge": ColorInterp.gray,
+    "lwir": ColorInterp.gray,
     "panchro": ColorInterp.gray,
     "alpha": ColorInterp.alpha,
 }
